@@ -11,7 +11,6 @@ find_package(rosidl_default_generators REQUIRED)
 
 # Service files
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/MoveLeft.srv"
   "srv/StringService.srv"
   DEPENDENCIES # Add any dependencies here if needed
 )

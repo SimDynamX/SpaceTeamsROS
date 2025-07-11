@@ -1,215 +1,180 @@
-# SpaceTeams Rover Control System
+# SpaceTeams ROS 2 Integration
 
-This repository contains a rover control system that integrates the SpaceTeams simulation environment with ROS2 for remote operation. The system consists of two main components:
+This repository provides ROS 2 integration for SpaceTeams, a UE5-based space simulation software. It contains service definitions and example code for students participating in the SpaceTeams university competition.
 
-1. **RoverDriving.py** - Main rover simulation controller that connects to SpaceTeams and provides ROS2 services
-2. **ROS2 Packages** - Service definitions and client utilities for rover control
+## Overview
 
-## Repository Structure
+SpaceTeams communicates with ROS 2 through a Python script using `roslibpy`, which interfaces with the ROS 2 ecosystem via `rosbridge_server`. This repository provides:
 
-```
-all_in_one/
-├── RoverDriving.py                 # Main rover controller (SpaceTeams + ROS2 bridge)
-├── first_time_setup.bash           # Initial setup script
-├── run_rosbridge.bash              # Script to launch ROS bridge server
-├── space_teams_definitions/        # ROS2 service definitions
-│   ├── srv/
-│   │   ├── MoveLeft.srv            # Rover movement service
-│   │   └── StringService.srv       # Logging service
-│   ├── CMakeLists.txt
-│   └── package.xml
-├── space_teams_python/             # ROS2 Python utilities
-│   ├── space_teams_python/
-│   │   ├── __init__.py
-│   │   └── example_client.py       # Example ROS2 client
-│   ├── resource/
-│   ├── package.xml
-│   ├── setup.py
-│   └── setup.cfg
-├── build/                          # Colcon build artifacts
-├── install/                        # Colcon install artifacts
-└── log/                           # Build logs
-```
+- Custom ROS 2 service definitions for SpaceTeams communication
+- Example Python client demonstrating service usage
+- Setup scripts for easy installation and configuration
+- Bridge setup for UE5 ↔ ROS 2 communication
 
-## System Overview
+## Prerequisites
 
-This system creates a bridge between the SpaceTeams lunar rover simulation and ROS2, enabling:
+- **Operating System**: Linux (Ubuntu recommended)
+- **ROS 2**: Any distribution with rosbridge_server support (Humble, Iron, Jazzy, Rolling)
+- **Python**: Python 3.6+
+- **Internet connection** for package installation
 
-- **Lunar Surface Navigation**: The rover navigates between predefined waypoints on the Moon using elevation data
-- **Remote Control**: ROS2 services allow external systems to control rover acceleration
-- **Web Interface**: ROSBridge enables web-based control through WebSocket connections
-- **Real-time Logging**: Comprehensive logging for debugging and monitoring
+## Quick Start
 
-## Service Definitions
+### 1. Clone the Repository
 
-### MoveLeft Service
-**Request:**
-- `float64 data` - Accelerator command value
-
-**Response:**
-- `bool success` - Whether the operation was successful
-
-### StringService
-**Request:**
-- `string data` - Message to log
-
-**Response:**
-- `bool success` - Whether logging was successful
-
-## Setup and Installation
-
-### Prerequisites
-- ROS2 (Humble/Iron recommended)
-- Python 3
-- SpaceTeams simulation environment
-- Linux/WSL environment (for bash scripts)
-
-### First-Time Setup
-
-1. **Run the setup script** (installs ROSBridge and builds service definitions):
 ```bash
+git clone https://github.com/SimDynamX/SpaceTeamsROS.git
+cd SpaceTeamsROS
+```
+
+### 2. First Time Setup
+
+Run the setup script to install dependencies and build the project:
+
+```bash
+chmod +x first_time_setup.bash
 ./first_time_setup.bash
 ```
 
 This script will:
-- Detect your ROS2 distribution
+- Auto-detect your ROS 2 distribution
+- Source the ROS 2 environment
 - Install `rosbridge_server` if not already installed
-- Build the `space_teams_definitions` package
+- Build the `space_teams_definitions` package using colcon
 
-2. **Build the Python package** (optional, for using example clients):
+### 3. Start the ROS Bridge
+
+In a new terminal, start the rosbridge server:
+
 ```bash
-colcon build --packages-select space_teams_python
-source install/setup.bash
-```
-
-## Running the System
-
-The system requires three components to be running:
-
-### 1. Start ROSBridge Server
-```bash
+chmod +x run_rosbridge.bash
 ./run_rosbridge.bash
 ```
-This launches the ROS-to-WebSocket bridge on port 9090.
 
-### 2. Start the SpaceTeams Rover Simulation
+This will:
+- Source the ROS 2 environment
+- Source the local workspace
+- Launch the rosbridge WebSocket server (default port: 9090)
+
+**Keep this terminal running** - SpaceTeams needs the bridge to be active for communication.
+
+### 4. Test the Setup (Optional)
+
+In another terminal, test the example client:
+
 ```bash
-python RoverDriving.py [simulation_arguments]
-```
-This connects to the SpaceTeams simulation and:
-- Loads lunar elevation data
-- Sets up waypoint navigation
-- Starts the ROS2 service server for `/move_left`
-- Provides accelerator control via ROS2 services
-
-### 3. Control the Rover (Optional)
-
-#### Using the Example Client:
-```bash
+# Source your workspace
 source install/setup.bash
+
+# Run the example client
 ros2 run space_teams_python example_client "Hello SpaceTeams!"
 ```
 
-#### Using ROS2 Service Commands:
-```bash
-# List available services
-ros2 service list
-
-# Send accelerator command
-ros2 service call /move_left space_teams_definitions/srv/MoveLeft "{data: 0.5}"
-
-# Send log message
-ros2 service call /log_message space_teams_definitions/srv/StringService "{data: 'Custom log message'}"
-```
-
-#### Using Web Interface (via ROSBridge):
-Connect to `ws://localhost:9090` and send JSON commands:
-```json
-{
-  "op": "call_service",
-  "service": "/move_left",
-  "args": {
-    "data": 0.5
-  }
-}
-```
-
-## Key Features
-
-- **Lunar Terrain Navigation**: Uses multi-resolution elevation data for realistic lunar surface navigation
-- **Waypoint Following**: Automatically navigates between predefined latitude/longitude waypoints
-- **ROS2 Integration**: Provides standard ROS2 services for rover control
-- **Web Interface Support**: ROSBridge enables browser-based control and monitoring
-- **Real-time Control**: Direct accelerator control with immediate response
-- **Comprehensive Logging**: Built-in logging system for debugging and telemetry
-- **Fault Tolerance**: Error handling and connection management
-
-## Architecture
+## Repository Structure
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Web Client    │    │   ROS2 Client    │    │ SpaceTeams Sim  │
-│   (Browser)     │    │   (Python/C++)   │    │   Environment   │
-└─────────┬───────┘    └─────────┬────────┘    └─────────┬───────┘
-          │                      │                       │
-          │ WebSocket            │ ROS2 Services         │ Native API
-          │ (Port 9090)          │                       │
-          │                      │                       │
-      ┌───▼──────────────────────▼───────────────────────▼───┐
-      │              RoverDriving.py                         │
-      │  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐ │
-      │  │ ROSBridge   │  │ ROS2 Services│  │ SpaceTeams  │ │
-      │  │ Server      │  │    Server    │  │ Integration │ │
-      │  └─────────────┘  └──────────────┘  └─────────────┘ │
-      └─────────────────────────────────────────────────────┘
+SpaceTeamsROS/
+├── first_time_setup.bash          # Initial setup script
+├── run_rosbridge.bash             # ROS bridge launcher
+├── space_teams_definitions/       # Custom service definitions
+│   ├── CMakeLists.txt
+│   ├── package.xml
+│   └── srv/
+│       └── StringService.srv      # String-based service definition
+└── space_teams_python/           # Python package with examples
+    ├── package.xml
+    ├── setup.py
+    ├── setup.cfg
+    └── space_teams_python/
+        ├── __init__.py
+        └── example_client.py       # Example service client
 ```
 
-## Dependencies
+## Service Definitions
 
-- **ROS2** (Humble/Iron recommended)
-- **Python 3.8+**
-- **SpaceTeams Simulation Framework**
-- **roslibpy** - ROS client library for Python
-- **rosbridge_server** - WebSocket interface for ROS
-- **numpy** - Numerical computations
-- **Custom packages**:
-  - `space_teams_definitions` - Service message definitions
-  - `space_teams_python` - Python utilities
+### StringService
+
+Located in `space_teams_definitions/srv/StringService.srv`
+
+**Request:**
+```
+string data
+```
+
+**Response:**
+```
+bool success
+```
+
+This service accepts a string message and returns a success status. Use this as a template for creating your own SpaceTeams communication services.
+
+## Usage in SpaceTeams
+
+1. **Start ROS Bridge**: Always run `./run_rosbridge.bash` before launching SpaceTeams
+2. **SpaceTeams Connection**: SpaceTeams will connect to the rosbridge WebSocket server (usually `ws://localhost:9090`)
+3. **Service Communication**: SpaceTeams can call ROS 2 services and receive responses through the bridge
+
+## Development
+
+### Adding New Services
+
+1. Create a new `.srv` file in `space_teams_definitions/srv/`
+2. Add the service to `CMakeLists.txt`:
+   ```cmake
+   rosidl_generate_interfaces(${PROJECT_NAME}
+     "srv/StringService.srv"
+     "srv/YourNewService.srv"  # Add this line
+     DEPENDENCIES
+   )
+   ```
+3. Rebuild the package:
+   ```bash
+   colcon build --packages-select space_teams_definitions
+   source install/setup.bash
+   ```
+
+### Creating Service Servers
+
+Create Python nodes that implement your services. See `example_client.py` for client implementation patterns.
 
 ## Troubleshooting
 
-### Build Issues
-- **ROS2 not found**: Ensure ROS2 is properly installed and sourced
-- **Service definitions not found**: Run `./first_time_setup.bash` to build the definitions package
-- **Colcon build fails**: Make sure you're in the correct workspace directory
+### ROS 2 Not Found
+- Ensure ROS 2 is properly installed
+- Check that `/opt/ros/[DISTRO]/setup.bash` exists
+- Manually source ROS 2: `source /opt/ros/humble/setup.bash` (replace 'humble' with your distribution)
 
-### Runtime Issues
-- **ROSBridge connection failed**: 
-  - Check if `./run_rosbridge.bash` is running
-  - Verify port 9090 is not blocked by firewall
-  - Ensure ROSBridge server is installed: `sudo apt install ros-$ROS_DISTRO-rosbridge-server`
+### Rosbridge Connection Issues
+- Verify rosbridge is running: `ros2 node list | grep rosbridge`
+- Check WebSocket port: `netstat -an | grep 9090`
+- Ensure firewall allows port 9090
 
-- **SpaceTeams simulation issues**:
-  - Verify SpaceTeams framework is properly installed
-  - Check that lunar elevation data files are accessible
-  - Ensure simulation arguments are correctly passed to `RoverDriving.py`
+### Build Errors
+- Install build dependencies: `sudo apt install python3-colcon-common-extensions`
+- Clean and rebuild: `rm -rf build install log && colcon build`
 
-- **Service not available**:
-  - Confirm `RoverDriving.py` is running and connected to simulation
-  - Check ROS2 service list: `ros2 service list`
-  - Verify workspace is sourced: `source install/setup.bash`
+### Permission Denied on Scripts
+```bash
+chmod +x first_time_setup.bash
+chmod +x run_rosbridge.bash
+```
 
-### Development Tips
-- Use `ros2 topic echo` to monitor service calls
-- Check logs in the `log/` directory for build issues
-- Monitor SpaceTeams logger output for simulation debugging
-- Test services individually before integrating with web interfaces
+## Supported ROS 2 Distributions
 
-## File Descriptions
+This package supports ROS 2 distributions that include `rosbridge_server`:
+- **ROS 2 Humble** (LTS) - Recommended
+- **ROS 2 Iron**
+- **ROS 2 Jazzy** (LTS)
+- **ROS 2 Rolling** (Latest)
 
-- **`RoverDriving.py`**: Main simulation controller, connects SpaceTeams to ROS2
-- **`first_time_setup.bash`**: Automated setup script for dependencies and initial build
-- **`run_rosbridge.bash`**: Launches ROSBridge WebSocket server
-- **`space_teams_definitions/`**: ROS2 message and service definitions
-- **`space_teams_python/`**: Example clients and utilities
-- **`build/`, `install/`, `log/`**: Colcon workspace artifacts (auto-generated)
+## Competition Notes
+
+This repository serves as a starting template for SpaceTeams competition participants. The service definitions and examples will be expanded and modified throughout the competition development process.
+
+## License
+
+Apache License 2.0
+
+## Support
+
+For SpaceTeams-specific questions, refer to the competition documentation. For ROS 2 issues, consult the [ROS 2 documentation](https://docs.ros.org/en/humble/).
