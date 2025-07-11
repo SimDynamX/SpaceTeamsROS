@@ -15,6 +15,7 @@ SpaceTeams communicates with ROS 2 through a Python script using `roslibpy`, whi
 
 - **Operating System**: Linux (Ubuntu recommended)
 - **ROS 2**: Any distribution with rosbridge_server support (Humble, Iron, Jazzy, Rolling)
+    - To install ROS2 Humble, follow this tutorial: https://docs.ros.org/en/humble/Installation.html
 - **Python**: Python 3.6+
 - **Internet connection** for package installation
 
