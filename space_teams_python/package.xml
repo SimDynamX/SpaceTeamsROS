@@ -3,7 +3,7 @@
 <package format="3">
   <name>space_teams_python</name>
   <version>0.0.0</version>
-  <description>Python ROS2 package for SpaceTeams project with moveLeft service</description>
+  <description>Python ROS2 package for SpaceTeams project with an example service</description>
   <maintainer email="yotam@todo.todo">yotam</maintainer>
   <license>Apache-2.0</license>
 

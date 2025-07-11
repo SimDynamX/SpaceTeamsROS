@@ -20,7 +20,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'move_left_server = space_teams_python.move_left_server:main',
             'example_client = space_teams_python.example_client:main',
         ],
     },
