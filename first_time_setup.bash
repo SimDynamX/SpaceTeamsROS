@@ -27,5 +27,14 @@ else
     exit 1
 fi
 
-# Build the workspace using colcon
-colcon build
+#install rosbridge if not already installed
+if ! ros2 pkg list | grep -q rosbridge_server; then
+    echo "Installing rosbridge_server..."
+    sudo apt update
+    sudo apt install -y ros-$ROS_DISTRO-rosbridge-server
+else
+    echo "rosbridge_server is already installed."
+fi
+
+# Build the service definitions using colcon
+colcon build --packages-select space_teams_definitions

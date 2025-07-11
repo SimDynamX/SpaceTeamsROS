@@ -1,0 +1,5 @@
+# Request
+float64 data
+---
+# Response
+bool success
