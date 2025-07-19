@@ -11,7 +11,10 @@ find_package(rosidl_default_generators REQUIRED)
 
 # Service files
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/StringService.srv"
+  "srv/Float.srv"
+  "srv/String.srv"
+  "srv/Quaternion.srv"
+  "srv/Vector3d.srv"
   DEPENDENCIES # Add any dependencies here if needed
 )
 
