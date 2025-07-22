@@ -1,6 +1,6 @@
 # SpaceTeams ROS 2 Integration
 
-This repository provides ROS 2 integration for SpaceTeams, a UE5-based space simulation software. It contains service definitions and example code for students participating in the SpaceTeams university competition.
+This repository provides ROS 2 integration for SpaceTeams as well as an example navigation algorithm that is compatible with the ROSPoleBuggy sim location in the 'python-ros-comm2' branch.
 
 ## Overview
 
@@ -13,7 +13,7 @@ SpaceTeams communicates with ROS 2 through a Python script using `roslibpy`, whi
 
 ## Prerequisites
 
-- **Operating System**: Linux (Ubuntu recommended)
+- **Operating System**: Linux (Ubuntu in WSL recommended)
 - **ROS 2**: Any distribution with rosbridge_server support (Humble, Iron, Jazzy, Rolling)
     - To install ROS2 Humble, follow this tutorial: https://docs.ros.org/en/humble/Installation.html
 - **Python**: Python 3.6+
@@ -59,16 +59,18 @@ This will:
 
 **Keep this terminal running** - SpaceTeams needs the bridge to be active for communication.
 
-### 4. Test the Setup (Optional)
+### 4. Run the demo (Optional)
 
-In another terminal, test the example client:
+Make sure that rosbridge is still running and start the ROSPoleBuggy sim.
+After choosing a pawn, open up linux another terminal run the example client:
 
 ```bash
 # Source your workspace
+cd SpaceTeamsROS
 source install/setup.bash
 
 # Run the example client
-ros2 run space_teams_python example_client "Hello SpaceTeams!"
+ros2 run space_teams_python example_client
 ```
 
 ## Repository Structure
@@ -80,22 +82,61 @@ SpaceTeamsROS/
 ├── space_teams_definitions/       # Custom service definitions
 │   ├── CMakeLists.txt
 │   ├── package.xml
-│   └── srv/
-│       └── StringService.srv      # String-based service definition
+│   └── srv/                      # Service defenitions
+        ├── Float.srv
+        ├── Quaternion.srv
+        ├── String.srv
+│       └── Vector3d.srv     
 └── space_teams_python/           # Python package with examples
     ├── package.xml
     ├── setup.py
     ├── setup.cfg
     └── space_teams_python/
         ├── __init__.py
-        └── example_client.py       # Example service client
+        └── example_client.py       # Demo navigation algorithm
 ```
 
 ## Service Definitions
 
-### StringService
+### Float
 
-Located in `space_teams_definitions/srv/StringService.srv`
+Located in `space_teams_definitions/srv/Float.srv`
+
+**Request:**
+```
+Float data
+```
+
+**Response:**
+```
+bool success
+```
+
+This service accepts a float message and returns a success status. This is used for the steering, acceleration, and brake services.
+
+### Quaternion
+
+Located in `space_teams_definitions/srv/Quaternion.srv`
+
+**Request:**
+```
+Float x
+Float y
+Float z
+Float w
+```
+
+**Response:**
+```
+bool success
+```
+
+This service accepts a 4 floats representing a quaternion. This is used for the getRotation service.
+
+
+### String
+
+Located in `space_teams_definitions/srv/String.srv`
 
 **Request:**
 ```
@@ -107,17 +148,29 @@ string data
 bool success
 ```
 
-This service accepts a string message and returns a success status. Use this as a template for creating your own SpaceTeams communication services.
+This service accepts a string message and returns a success status. This is used for the loggerInfo service.
 
-## Usage in SpaceTeams
+### Vector3d
 
-1. **Start ROS Bridge**: Always run `./run_rosbridge.bash` before launching SpaceTeams
-2. **SpaceTeams Connection**: SpaceTeams will connect to the rosbridge WebSocket server (usually `ws://localhost:9090`)
-3. **Service Communication**: SpaceTeams can call ROS 2 services and receive responses through the bridge
+Located in `space_teams_definitions/srv/Vector3d.srv`
+
+**Request:**
+```
+Float x
+Float y
+Float z
+```
+
+**Response:**
+```
+bool success
+```
+
+This service accepts 3 floats representing a 3d-vector returns a success status. This is used for the getLocation service.
 
 ## Development
 
-### Adding New Services
+<!-- ### Adding New Services
 
 1. Create a new `.srv` file in `space_teams_definitions/srv/`
 2. Add the service to `CMakeLists.txt`:
@@ -132,11 +185,124 @@ This service accepts a string message and returns a success status. Use this as 
    ```bash
    colcon build --packages-select space_teams_definitions
    source install/setup.bash
-   ```
+   ``` -->
 
-### Creating Service Servers
+### Creating your own client
 
-Create Python nodes that implement your services. See `example_client.py` for client implementation patterns.
+The `example_client.py` provides a good blueprint of what a client node interacting with SpaceTeams should look like. To create your own ROS node that interacts with ROSPoleBuggy, follow these steps:
+
+#### 1. Set up your Python ROS 2 node
+
+Create a new Python file in your package and import the necessary modules:
+
+```python
+#!/usr/bin/env python3
+
+import rclpy
+from rclpy.node import Node
+from space_teams_definitions.srv import String, Vector3d, Float, Quaternion
+```
+
+#### 2. Create service clients
+
+In your node's `__init__` method, create clients for the SpaceTeams services:
+
+```python
+class YourRoverController(Node):
+    def __init__(self):
+        super().__init__('your_rover_controller')
+        
+        # Create service clients
+        self.logger_client = self.create_client(String, 'log_message')
+        self.steer_client = self.create_client(Float, 'Steer')
+        self.accelerator_client = self.create_client(Float, 'Accelerator')
+        self.brake_client = self.create_client(Float, 'Brake')
+        self.location_client = self.create_client(Vector3d, 'GetLocation')
+        self.rotation_client = self.create_client(Quaternion, 'GetRotation')
+        
+        # Wait for services to be available
+        while not self.logger_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('log_message service not available, waiting...')
+```
+
+#### 3. Implement service call methods
+
+Create helper methods to interact with each service:
+
+```python
+def log_message(self, message):
+    """Send a log message to SpaceTeams"""
+    request = String.Request()
+    request.data = message
+    future = self.logger_client.call_async(request)
+    return future
+
+def get_current_location(self):
+    """Get the current location of the rover"""
+    request = Vector3d.Request()
+    future = self.location_client.call_async(request)
+    rclpy.spin_until_future_complete(self, future)
+    
+    if future.result() is not None and future.result().success:
+        response = future.result()
+        return response.x, response.y, response.z
+    return None, None, None
+
+def send_steer_command(self, steer_value):
+    """Send steering command (-1 to 1, negative = left, positive = right)"""
+    request = Float.Request()
+    request.data = max(-1.0, min(1.0, steer_value))  # Clamp to [-1, 1]
+    future = self.steer_client.call_async(request)
+    return future
+
+def send_accelerator_command(self, accel_value):
+    """Send acceleration command (0 to 1)"""
+    request = Float.Request()
+    request.data = max(0.0, min(1.0, accel_value))  # Clamp to [0, 1]
+    future = self.accelerator_client.call_async(request)
+    return future
+```
+
+#### 4. Implement your navigation logic
+
+Use the service methods to create your navigation algorithm. The example client demonstrates a simple coordinate-based navigation system that:
+- Gets the current position and orientation
+- Calculates bearing and distance to target
+- Applies proportional steering control
+- Adjusts speed based on proximity and heading error
+
+## Available Services
+
+SpaceTeams provides the following ROS 2 services for rover control and telemetry:
+
+### Control Services
+
+| Service Name | Type | Description | Input Range |
+|-------------|------|-------------|-------------|
+| `Steer` | Float | Controls rover steering | -1.0 to 1.0 (negative = left, positive = right) |
+| `Accelerator` | Float | Controls rover acceleration | 0.0 to 1.0 (0 = no acceleration, 1 = full throttle) |
+| `Brake` | Float | Controls rover braking | 0.0 to 1.0 (0 = no brake, 1 = full brake) |
+
+### Telemetry Services
+
+| Service Name | Type | Description | Response Fields |
+|-------------|------|-------------|-----------------|
+| `GetLocation` | Vector3d | Gets rover's current position | `x`, `y`, `z` coordinates |
+| `GetRotation` | Quaternion | Gets rover's current orientation | `x`, `y`, `z`, `w` quaternion components |
+
+### Logging Service
+
+| Service Name | Type | Description | Usage |
+|-------------|------|-------------|-------|
+| `log_message` | String | Sends log messages to SpaceTeams | Use for debugging and status reporting |
+
+### Service Response Format
+
+All services return a boolean `success` field in addition to their specific data:
+- `true`: Service call was successful
+- `false`: Service call failed or encountered an error
+
+Example usage patterns are demonstrated in the `example_client.py` file, which implements a complete navigation algorithm using these services. 
 
 ## Troubleshooting
 
