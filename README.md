@@ -1,6 +1,6 @@
 # SpaceTeams ROS 2 Integration
 
-This repository provides ROS 2 integration for SpaceTeams as well as an example navigation algorithm that is compatible with the Competition sim location in the 'python-ros-comm2' branch.
+This repository provides ROS 2 integration for SpaceTeams as well as an example navigation algorithm for the Competition.
 
 ## Overview
 
