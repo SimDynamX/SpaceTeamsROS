@@ -69,6 +69,9 @@ After choosing a pawn, open up linux another terminal run the example client:
 cd SpaceTeamsROS
 source install/setup.bash
 
+# build the python package
+colcon build --packages-select space_teams_python
+
 # Run the example client
 ros2 run space_teams_python example_client
 ```
