@@ -1,6 +1,6 @@
 # SpaceTeams ROS 2 Integration
 
-This repository provides ROS 2 integration for SpaceTeams as well as an example navigation algorithm that is compatible with the ROSPoleBuggy sim location in the 'python-ros-comm2' branch.
+This repository provides ROS 2 integration for SpaceTeams as well as an example navigation algorithm that is compatible with the Competition sim location in the 'python-ros-comm2' branch.
 
 ## Overview
 
@@ -61,7 +61,7 @@ This will:
 
 ### 4. Run the demo (Optional)
 
-Make sure that rosbridge is still running and start the ROSPoleBuggy sim.
+Make sure that rosbridge is still running and start the Competition sim.
 After choosing a pawn, open up linux another terminal run the example client:
 
 ```bash
@@ -192,7 +192,7 @@ This service accepts 3 floats representing a 3d-vector returns a success status.
 
 ### Creating your own client
 
-The `example_client.py` provides a good blueprint of what a client node interacting with SpaceTeams should look like. To create your own ROS node that interacts with ROSPoleBuggy, follow these steps:
+The `example_client.py` provides a good blueprint of what a client node interacting with SpaceTeams should look like. To create your own ROS node that interacts with SpaceTeams, follow these steps:
 
 #### 1. Set up your Python ROS 2 node
 
