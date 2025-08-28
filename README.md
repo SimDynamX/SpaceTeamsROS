@@ -192,6 +192,9 @@ This service accepts 3 floats representing a 3d-vector returns a success status.
 
 ### Creating your own client
 
+def get_current_location(self):
+def send_steer_command(self, steer_value):
+def send_accelerator_command(self, accel_value):
 The `example_client.py` provides a good blueprint of what a client node interacting with SpaceTeams should look like. To create your own ROS node that interacts with SpaceTeams, follow these steps:
 
 #### 1. Set up your Python ROS 2 node
@@ -214,7 +217,6 @@ In your node's `__init__` method, create clients for the SpaceTeams services:
 class YourRoverController(Node):
     def __init__(self):
         super().__init__('your_rover_controller')
-        
         # Create service clients
         self.logger_client = self.create_client(String, 'log_message')
         self.steer_client = self.create_client(Float, 'Steer')
@@ -222,10 +224,17 @@ class YourRoverController(Node):
         self.brake_client = self.create_client(Float, 'Brake')
         self.location_client = self.create_client(Vector3d, 'GetLocation')
         self.rotation_client = self.create_client(Quaternion, 'GetRotation')
-        
         # Wait for services to be available
-        while not self.logger_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('log_message service not available, waiting...')
+        for client, name in [
+            (self.logger_client, 'log_message'),
+            (self.steer_client, 'Steer'),
+            (self.accelerator_client, 'Accelerator'),
+            (self.brake_client, 'Brake'),
+            (self.location_client, 'GetLocation'),
+            (self.rotation_client, 'GetRotation')
+        ]:
+            while not client.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(f'Service {name} not available, waiting...')
 ```
 
 #### 3. Implement service call methods
@@ -234,35 +243,45 @@ Create helper methods to interact with each service:
 
 ```python
 def log_message(self, message):
-    """Send a log message to SpaceTeams"""
     request = String.Request()
     request.data = message
     future = self.logger_client.call_async(request)
     return future
 
 def get_current_location(self):
-    """Get the current location of the rover"""
     request = Vector3d.Request()
     future = self.location_client.call_async(request)
     rclpy.spin_until_future_complete(self, future)
-    
     if future.result() is not None and future.result().success:
         response = future.result()
         return response.x, response.y, response.z
     return None, None, None
 
+def get_current_rotation(self):
+    request = Quaternion.Request()
+    future = self.rotation_client.call_async(request)
+    rclpy.spin_until_future_complete(self, future)
+    if future.result() is not None and future.result().success:
+        response = future.result()
+        return response.x, response.y, response.z, response.w
+    return None, None, None, None
+
 def send_steer_command(self, steer_value):
-    """Send steering command (-1 to 1, negative = left, positive = right)"""
     request = Float.Request()
-    request.data = max(-1.0, min(1.0, steer_value))  # Clamp to [-1, 1]
+    request.data = max(-1.0, min(1.0, steer_value))
     future = self.steer_client.call_async(request)
     return future
 
 def send_accelerator_command(self, accel_value):
-    """Send acceleration command (0 to 1)"""
     request = Float.Request()
-    request.data = max(0.0, min(1.0, accel_value))  # Clamp to [0, 1]
+    request.data = max(0.0, min(1.0, accel_value))
     future = self.accelerator_client.call_async(request)
+    return future
+
+def send_brake_command(self, brake_value):
+    request = Float.Request()
+    request.data = max(0.0, min(1.0, brake_value))
+    future = self.brake_client.call_async(request)
     return future
 ```
 
@@ -280,24 +299,24 @@ SpaceTeams provides the following ROS 2 services for rover control and telemetry
 
 ### Control Services
 
-| Service Name | Type | Description | Input Range |
-|-------------|------|-------------|-------------|
-| `Steer` | Float | Controls rover steering | -1.0 to 1.0 (negative = left, positive = right) |
-| `Accelerator` | Float | Controls rover acceleration | 0.0 to 1.0 (0 = no acceleration, 1 = full throttle) |
-| `Brake` | Float | Controls rover braking | 0.0 to 1.0 (0 = no brake, 1 = full brake) |
+| Service Name   | Type  | Description                  | Input Range                                 |
+|---------------|-------|------------------------------|---------------------------------------------|
+| `Steer`       | Float | Controls rover steering      | -1.0 to 1.0 (negative = left, positive = right) |
+| `Accelerator` | Float | Controls rover acceleration  | 0.0 to 1.0 (0 = no acceleration, 1 = full throttle) |
+| `Brake`       | Float | Controls rover braking       | 0.0 to 1.0 (0 = no brake, 1 = full brake)   |
 
 ### Telemetry Services
 
-| Service Name | Type | Description | Response Fields |
-|-------------|------|-------------|-----------------|
-| `GetLocation` | Vector3d | Gets rover's current position | `x`, `y`, `z` coordinates |
-| `GetRotation` | Quaternion | Gets rover's current orientation | `x`, `y`, `z`, `w` quaternion components |
+| Service Name   | Type     | Description                   | Response Fields                |
+|---------------|----------|-------------------------------|-------------------------------|
+| `GetLocation`  | Vector3d | Gets rover's current position | `x`, `y`, `z` coordinates      |
+| `GetRotation`  | Quaternion | Gets rover's current orientation | `x`, `y`, `z`, `w` quaternion components |
 
 ### Logging Service
 
-| Service Name | Type | Description | Usage |
-|-------------|------|-------------|-------|
-| `log_message` | String | Sends log messages to SpaceTeams | Use for debugging and status reporting |
+| Service Name   | Type   | Description                  | Usage                        |
+|---------------|--------|------------------------------|------------------------------|
+| `log_message`  | String | Sends log messages to SpaceTeams | Use for debugging and status reporting |
 
 ### Service Response Format
 
@@ -305,7 +324,94 @@ All services return a boolean `success` field in addition to their specific data
 - `true`: Service call was successful
 - `false`: Service call failed or encountered an error
 
-Example usage patterns are demonstrated in the `example_client.py` file, which implements a complete navigation algorithm using these services. 
+Example usage patterns are demonstrated in the `example_client.py` file, which implements a complete navigation algorithm using these services.
+
+## Camera Features
+
+SpaceTeams provides a camera feed via ROS 2 image topics, allowing you to access and process real-time images from the rover's onboard camera. This is useful for computer vision, navigation, and debugging.
+
+### How to Use the Camera Feed
+
+1. **Subscribe to the Image Topic**
+   - The camera publishes images on the topic `camera/image_raw` using the standard `sensor_msgs/msg/Image` message type.
+   - You can subscribe to this topic in your ROS 2 node:
+
+   ```python
+   from sensor_msgs.msg import Image
+   self.subscription = self.create_subscription(
+       Image,
+       'camera/image_raw',
+       self.image_callback,
+       10
+   )
+   ```
+
+2. **Process Incoming Images**
+   - Use the `cv_bridge` library to convert ROS Image messages to OpenCV format for easy processing:
+
+   ```python
+   from cv_bridge import CvBridge
+   self.bridge = CvBridge()
+   def image_callback(self, msg):
+       cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+       # Now you can use OpenCV functions on cv_image
+   ```
+
+3. **Display or Analyze Images**
+   - You can display the camera feed using OpenCV:
+
+   ```python
+   import cv2
+   cv2.imshow('Camera Feed', cv_image)
+   cv2.waitKey(1)
+   ```
+   - You can also analyze pixel values, detect objects, or perform other computer vision tasks. For example, to log average RGB values:
+
+   ```python
+   import numpy as np
+   averageRed = np.mean(cv_image[:,:,2])
+   averageGreen = np.mean(cv_image[:,:,1])
+   averageBlue = np.mean(cv_image[:,:,0])
+   print(f'Average Red: {averageRed}, Average Green: {averageGreen}, Average Blue: {averageBlue}')
+   ```
+
+### Example: Minimal Image Client
+
+```python
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+import cv2
+
+class ImageClient(Node):
+    def __init__(self):
+        super().__init__('image_client')
+        self.bridge = CvBridge()
+        self.subscription = self.create_subscription(
+            Image,
+            'camera/image_raw',
+            self.image_callback,
+            10
+        )
+
+    def image_callback(self, msg):
+        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        cv2.imshow('Camera Feed', cv_image)
+        cv2.waitKey(1)
+
+def main(args=None):
+    rclpy.init(args=args)
+    image_client = ImageClient()
+    rclpy.spin(image_client)
+    image_client.destroy_node()
+    rclpy.shutdown()
+```
+
+### Notes
+- The camera feed is real-time and can be used for navigation, obstacle detection, or logging.
+- You can extend the image client to save images, run ML models, or visualize results.
+- Make sure to install `cv_bridge` and `opencv-python` in your ROS environment.
 
 ## Troubleshooting
 

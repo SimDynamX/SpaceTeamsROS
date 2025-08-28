@@ -2,235 +2,188 @@
 
 import rclpy
 from rclpy.node import Node
-from space_teams_definitions.srv import String, Vector3d, Float, Quaternion
-import sys
+from space_teams_definitions.srv import String, Float
+from geometry_msgs.msg import Point, Quaternion
 import math
 import time
-
 
 class RoverController(Node):
     def __init__(self):
         super().__init__('RoverController')
-        
-        # Create service clients
+        # Service clients
         self.logger_client = self.create_client(String, 'log_message')
         self.steer_client = self.create_client(Float, 'Steer')
         self.accelerator_client = self.create_client(Float, 'Accelerator')
         self.brake_client = self.create_client(Float, 'Brake')
-        self.location_client = self.create_client(Vector3d, 'GetLocation')
-        self.rotation_client = self.create_client(Quaternion, 'GetRotation')
-        
-        # Wait for all services to be available
-        services = [
-            (self.logger_client, 'log_message'),
-            (self.steer_client, 'Steer'),
-            (self.accelerator_client, 'Accelerator'),
-            (self.brake_client, 'Brake'),
-            (self.location_client, 'GetLocation'),
-            (self.rotation_client, 'GetRotation')
-        ]
-        
-        for client, service_name in services:
-            while not client.wait_for_service(timeout_sec=1.0):
-                self.get_logger().info(f'Service {service_name} not available, waiting again...')
-        
-        self.get_logger().info('Rover controller is ready.')
-        
-        # Control parameters
+
+        # Topic subscriptions
+        self.current_location = None
+        self.current_rotation = None
+        self.create_subscription(Point, 'Location', self.location_callback, 10)
+        self.create_subscription(Quaternion, 'Rotation', self.rotation_callback, 10)
+
+        # Control state
         self.target_x = None
         self.target_y = None
-        self.tolerance = 5.0  # Distance tolerance to consider target reached
-        self.max_speed = 0.5  # Maximum acceleration
-        self.max_steer = 1.0  # Maximum steering
+        self.tolerance = 5.0
+        self.max_speed = 0.5
+        self.navigation_active = False
+        self.navigation_iterations = 0
+        self.max_iterations = 1000
+        self.initial_move_end_time = None
+        self.initial_move_done = False
+
+        # Timer for control loop
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.get_logger().info('Rover controller is ready.')
+
+    def location_callback(self, msg):
+        self.current_location = msg
+
+    def rotation_callback(self, msg):
+        self.current_rotation = msg
 
     def log_message(self, message):
-        """Send a log message"""
         request = String.Request()
         request.data = message
         future = self.logger_client.call_async(request)
         return future
 
-    def get_current_location(self):
-        """Get the current location of the rover"""
-        request = Vector3d.Request()
-        future = self.location_client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
-        
-        if future.result() is not None:
-            response = future.result()
-            if response.success:
-                return response.x, response.y, response.z
-        return None, None, None
-
-    def get_current_rotation(self):
-        """Get the current rotation of the rover"""
-        request = Quaternion.Request()
-        future = self.rotation_client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
-        
-        if future.result() is not None:
-            response = future.result()
-            if response.success:
-                return response.x, response.y, response.z, response.w
-        return None, None, None, None
-
     def send_steer_command(self, steer_value):
-        """Send steering command (-1 to 1, negative = left, positive = right)"""
         request = Float.Request()
-        request.data = max(-1.0, min(1.0, steer_value))  # Clamp to [-1, 1]
-        future = self.steer_client.call_async(request)
-        return future
+        request.data = max(-1.0, min(1.0, steer_value))
+        return self.steer_client.call_async(request)
 
     def send_accelerator_command(self, accel_value):
-        """Send acceleration command (0 to 1)"""
         request = Float.Request()
-        request.data = max(0.0, min(1.0, accel_value))  # Clamp to [0, 1]
-        future = self.accelerator_client.call_async(request)
-        return future
+        request.data = max(0.0, min(1.0, accel_value))
+        return self.accelerator_client.call_async(request)
 
     def send_brake_command(self, brake_value):
-        """Send brake command (0 to 1)"""
         request = Float.Request()
-        request.data = max(0.0, min(1.0, brake_value))  # Clamp to [0, 1]
-        future = self.brake_client.call_async(request)
-        return future
+        request.data = max(0.0, min(1.0, brake_value))
+        return self.brake_client.call_async(request)
 
     def quaternion_to_yaw(self, x, y, z, w):
-        """Convert quaternion to yaw angle in radians"""
-        # Calculate yaw from quaternion
         siny_cosp = 2 * (w * z + x * y)
         cosy_cosp = 1 - 2 * (y * y + z * z)
-        yaw = math.atan2(siny_cosp, cosy_cosp)
-        return yaw
+        return math.atan2(siny_cosp, cosy_cosp)
 
     def calculate_bearing_to_target(self, current_x, current_y, target_x, target_y):
-        """Calculate the bearing from current position to target in radians"""
         dx = target_x - current_x
         dy = target_y - current_y
-        bearing = math.atan2(dy, dx)
-        return bearing
+        return math.atan2(dy, dx)
 
     def calculate_distance_to_target(self, current_x, current_y, target_x, target_y):
-        """Calculate the distance to target"""
         dx = target_x - current_x
         dy = target_y - current_y
         return math.sqrt(dx*dx + dy*dy)
 
     def normalize_angle(self, angle):
-        """Normalize angle to [-pi, pi]"""
         while angle > math.pi:
             angle -= 2 * math.pi
         while angle < -math.pi:
             angle += 2 * math.pi
         return angle
 
-    def move_to_coordinate(self, target_x, target_y):
-        """Move the rover to the specified coordinate"""
+    def start_navigation(self, target_x, target_y):
         self.target_x = target_x
         self.target_y = target_y
-        
-        # Log the mission start
-        future = self.log_message(f"Starting navigation to target: ({target_x:.2f}, {target_y:.2f})")
-        rclpy.spin_until_future_complete(self, future)
-        
-        max_iterations = 1000  # Prevent infinite loops
-        iteration = 0
-        
-        while iteration < max_iterations:
-            # Get current position and orientation
-            current_x, current_y, current_z = self.get_current_location()
-            if current_x is None:
-                self.get_logger().error("Failed to get current location")
-                break
-                
-            qx, qy, qz, qw = self.get_current_rotation()
-            if qx is None:
-                self.get_logger().error("Failed to get current rotation")
-                break
-            
-            # Calculate distance to target
-            distance = self.calculate_distance_to_target(current_x, current_y, target_x, target_y)
-            
-            # Check if we've reached the target
-            if distance < self.tolerance:
-                # Stop the rover
-                self.send_brake_command(1.0)
-                rclpy.spin_until_future_complete(self, self.send_steer_command(0.0))
-                rclpy.spin_until_future_complete(self, self.send_accelerator_command(0.0))
-                
-                future = self.log_message(f"Target reached! Final position: ({current_x:.2f}, {current_y:.2f})")
-                rclpy.spin_until_future_complete(self, future)
-                break
-            
-            # Calculate current heading and desired bearing
-            current_yaw = self.quaternion_to_yaw(qx, qy, qz, qw)
-            target_bearing = self.calculate_bearing_to_target(current_x, current_y, target_x, target_y)
-            
-            # Calculate steering error
-            heading_error = self.normalize_angle(target_bearing - current_yaw)
-            
-            # Calculate steering command (proportional control)
-            steer_gain = 2.0  # Steering sensitivity
-            steer_command = max(-1.0, min(1.0, steer_gain * heading_error))
-            
-            # Calculate acceleration based on distance and heading error
-            # Slow down when close to target or when steering correction is large
-            distance_factor = min(1.0, distance / 50.0)  # Slow down when closer than 50 units
-            heading_factor = max(0.3, 1.0 - abs(heading_error) / math.pi)  # Slow down for large heading errors
-            
-            accel_command = self.max_speed * distance_factor * heading_factor
-            
-            # Send commands
-            rclpy.spin_until_future_complete(self, self.send_steer_command(steer_command))
-            rclpy.spin_until_future_complete(self, self.send_accelerator_command(accel_command))
-            rclpy.spin_until_future_complete(self, self.send_brake_command(0.0))
-            
-            # Log progress every 10 iterations
-            if iteration % 10 == 0:
-                future = self.log_message(
-                    f"Position: ({current_x:.2f}, {current_y:.2f}), "
-                    f"Distance: {distance:.2f}, "
-                    f"Heading error: {math.degrees(heading_error):.1f}°, "
-                    f"Steer: {steer_command:.2f}, "
-                    f"Accel: {accel_command:.2f}"
-                )
-                rclpy.spin_until_future_complete(self, future)
-            
-            iteration += 1
-            time.sleep(0.1)  # Small delay for control loop
-        
-        if iteration >= max_iterations:
-            future = self.log_message("Maximum iterations reached, stopping navigation")
-            rclpy.spin_until_future_complete(self, future)
+        self.navigation_active = True
+        self.navigation_iterations = 0
+        self.initial_move_done = False
+        self.initial_move_end_time = time.time() + 4.0
+        self.log_message(f"Starting navigation to target: ({target_x:.2f}, {target_y:.2f})")
+        self.send_accelerator_command(0.5)
 
+    def timer_callback(self):
+        if not self.navigation_active:
+            return
+
+        # Initial move forward for 4 seconds
+        if not self.initial_move_done and self.initial_move_end_time is not None:
+            if time.time() < self.initial_move_end_time:
+                return
+            self.send_accelerator_command(0.0)
+            self.initial_move_done = True
+        # Navigation logic
+        if self.navigation_iterations >= self.max_iterations:
+            self.log_message("Maximum iterations reached, stopping navigation")
+            self.navigation_active = False
+            return
+
+        if self.current_location is None or self.current_rotation is None:
+            self.get_logger().info("Waiting for location/rotation update...")
+            return
+
+        current_x = self.current_location.x
+        current_y = self.current_location.y
+        current_z = self.current_location.z
+        qx = self.current_rotation.x
+        qy = self.current_rotation.y
+        qz = self.current_rotation.z
+        qw = self.current_rotation.w
+
+        distance = self.calculate_distance_to_target(current_x, current_y, self.target_x, self.target_y)
+        if distance < self.tolerance:
+            self.get_logger().info("Target reached. Sending stop commands.")
+            self.send_brake_command(1.0)
+            self.send_steer_command(0.0)
+            self.send_accelerator_command(0.0)
+            self.log_message(f"Target reached! Final position: ({current_x:.2f}, {current_y:.2f})")
+            self.navigation_active = False
+            return
+
+        current_yaw = self.quaternion_to_yaw(qx, qy, qz, qw)
+        target_bearing = self.calculate_bearing_to_target(current_x, current_y, self.target_x, self.target_y)
+        heading_error = self.normalize_angle(target_bearing - current_yaw)
+        steer_gain = 2.0
+        steer_command = max(-1.0, min(1.0, steer_gain * heading_error))
+        distance_factor = min(1.0, distance / 50.0)
+        heading_factor = max(0.3, 1.0 - abs(heading_error) / math.pi)
+        accel_command = self.max_speed * distance_factor * heading_factor
+
+        self.send_steer_command(steer_command)
+        self.send_accelerator_command(accel_command)
+        self.send_brake_command(0.0)
+
+        if self.navigation_iterations % 10 == 0:
+            self.log_message(
+                f"Position: ({current_x:.2f}, {current_y:.2f}), "
+                f"Distance: {distance:.2f}, "
+                f"Heading error: {math.degrees(heading_error):.1f}°, "
+                f"Steer: {steer_command:.2f}, "
+                f"Accel: {accel_command:.2f}"
+            )
+        self.navigation_iterations += 1
 
 def main(args=None):
     rclpy.init(args=args)
-
     rover_controller = RoverController()
 
-    # Get current location to set target
-    current_x, current_y, current_z = rover_controller.get_current_location()
-    
-    if current_x is not None:
-        # Set target as current position + 100 in both x and y directions
-        target_x = current_x + 100.0
-        target_y = current_y + 100.0
-        
-        # Log the mission
-        future = rover_controller.log_message(
-            f"Starting mission: Moving from ({current_x:.2f}, {current_y:.2f}) to ({target_x:.2f}, {target_y:.2f})"
-        )
-        rclpy.spin_until_future_complete(rover_controller, future)
-        
-        # Execute the navigation
-        rover_controller.move_to_coordinate(target_x, target_y)
-    else:
-        rover_controller.get_logger().error('Failed to get initial location')
-    
-    rover_controller.destroy_node()
-    rclpy.shutdown()
+    # Wait for initial location and rotation
+    while rclpy.ok():
+        if rover_controller.current_location is not None and rover_controller.current_rotation is not None:
+            break
+        rover_controller.get_logger().info('Waiting for initial location and rotation...')
+        rclpy.spin_once(rover_controller, timeout_sec=0.5)
 
+    current_x = rover_controller.current_location.x
+    current_y = rover_controller.current_location.y
+    current_z = rover_controller.current_location.z
+
+    target_x = current_x + 100.0
+    target_y = current_y + 100.0
+    rover_controller.log_message(
+        f"Starting mission: Moving from ({current_x:.2f}, {current_y:.2f}) to ({target_x:.2f}, {target_y:.2f})"
+    )
+    rover_controller.start_navigation(target_x, target_y)
+
+    try:
+        rclpy.spin(rover_controller)
+    finally:
+        rover_controller.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
