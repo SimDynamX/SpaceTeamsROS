@@ -85,18 +85,18 @@ SpaceTeamsROS/
 ├── space_teams_definitions/       # Custom service definitions
 │   ├── CMakeLists.txt
 │   ├── package.xml
-│   └── srv/                      # Service defenitions
+│   └── srv/                       # Service defenitions
         ├── Float.srv
-        ├── Quaternion.srv
-        ├── String.srv
-│       └── Vector3d.srv     
-└── space_teams_python/           # Python package with examples
+    ├── String.srv
+    # (Custom service definitions for other features, if needed)
+└── space_teams_python/            # Python package with examples
     ├── package.xml
     ├── setup.py
     ├── setup.cfg
     └── space_teams_python/
         ├── __init__.py
-        └── example_client.py       # Demo navigation algorithm
+        ├── example_client.py       # Demo navigation algorithm
+        └── image_client.py         # Demo camera usage
 ```
 
 ## Service Definitions
@@ -117,26 +117,6 @@ bool success
 
 This service accepts a float message and returns a success status. This is used for the steering, acceleration, and brake services.
 
-### Quaternion
-
-Located in `space_teams_definitions/srv/Quaternion.srv`
-
-**Request:**
-```
-Float x
-Float y
-Float z
-Float w
-```
-
-**Response:**
-```
-bool success
-```
-
-This service accepts a 4 floats representing a quaternion. This is used for the getRotation service.
-
-
 ### String
 
 Located in `space_teams_definitions/srv/String.srv`
@@ -153,23 +133,6 @@ bool success
 
 This service accepts a string message and returns a success status. This is used for the loggerInfo service.
 
-### Vector3d
-
-Located in `space_teams_definitions/srv/Vector3d.srv`
-
-**Request:**
-```
-Float x
-Float y
-Float z
-```
-
-**Response:**
-```
-bool success
-```
-
-This service accepts 3 floats representing a 3d-vector returns a success status. This is used for the getLocation service.
 
 ## Development
 
@@ -206,7 +169,8 @@ Create a new Python file in your package and import the necessary modules:
 
 import rclpy
 from rclpy.node import Node
-from space_teams_definitions.srv import String, Vector3d, Float, Quaternion
+from space_teams_definitions.srv import String, Float
+from geometry_msgs.msg import Point, Quaternion
 ```
 
 #### 2. Create service clients
@@ -222,8 +186,8 @@ class YourRoverController(Node):
         self.steer_client = self.create_client(Float, 'Steer')
         self.accelerator_client = self.create_client(Float, 'Accelerator')
         self.brake_client = self.create_client(Float, 'Brake')
-        self.location_client = self.create_client(Vector3d, 'GetLocation')
-        self.rotation_client = self.create_client(Quaternion, 'GetRotation')
+    # self.location_client = self.create_client(Vector3d, 'GetLocation')  # (Removed, now using topics)
+    # self.rotation_client = self.create_client(Quaternion, 'GetRotation')  # (Removed, now using topics)
         # Wait for services to be available
         for client, name in [
             (self.logger_client, 'log_message'),
@@ -248,23 +212,8 @@ def log_message(self, message):
     future = self.logger_client.call_async(request)
     return future
 
-def get_current_location(self):
-    request = Vector3d.Request()
-    future = self.location_client.call_async(request)
-    rclpy.spin_until_future_complete(self, future)
-    if future.result() is not None and future.result().success:
-        response = future.result()
-        return response.x, response.y, response.z
-    return None, None, None
-
 def get_current_rotation(self):
-    request = Quaternion.Request()
-    future = self.rotation_client.call_async(request)
-    rclpy.spin_until_future_complete(self, future)
-    if future.result() is not None and future.result().success:
-        response = future.result()
-        return response.x, response.y, response.z, response.w
-    return None, None, None, None
+## (Removed get_current_location and get_current_rotation service calls; now use topic callbacks)
 
 def send_steer_command(self, steer_value):
     request = Float.Request()
@@ -309,8 +258,8 @@ SpaceTeams provides the following ROS 2 services for rover control and telemetry
 
 | Service Name   | Type     | Description                   | Response Fields                |
 |---------------|----------|-------------------------------|-------------------------------|
-| `GetLocation`  | Vector3d | Gets rover's current position | `x`, `y`, `z` coordinates      |
-| `GetRotation`  | Quaternion | Gets rover's current orientation | `x`, `y`, `z`, `w` quaternion components |
+| `Location`  | geometry_msgs/Point | Rover's current position (topic) | `x`, `y`, `z` coordinates      |
+| `Rotation`  | geometry_msgs/Quaternion | Rover's current orientation (topic) | `x`, `y`, `z`, `w` quaternion components |
 
 ### Logging Service
 
@@ -365,15 +314,8 @@ SpaceTeams provides a camera feed via ROS 2 image topics, allowing you to access
    cv2.imshow('Camera Feed', cv_image)
    cv2.waitKey(1)
    ```
-   - You can also analyze pixel values, detect objects, or perform other computer vision tasks. For example, to log average RGB values:
+   - You can also analyze pixel values, detect objects, or perform other computer vision tasks
 
-   ```python
-   import numpy as np
-   averageRed = np.mean(cv_image[:,:,2])
-   averageGreen = np.mean(cv_image[:,:,1])
-   averageBlue = np.mean(cv_image[:,:,0])
-   print(f'Average Red: {averageRed}, Average Green: {averageGreen}, Average Blue: {averageBlue}')
-   ```
 
 ### Example: Minimal Image Client
 

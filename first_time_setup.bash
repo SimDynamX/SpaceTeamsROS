@@ -36,5 +36,22 @@ else
     echo "rosbridge_server is already installed."
 fi
 
+# Install cv_bridge if not already installed
+if ! ros2 pkg list | grep -q cv_bridge; then
+    echo "Installing cv_bridge..."
+    sudo apt update
+    sudo apt install -y ros-$ROS_DISTRO-cv-bridge
+else
+    echo "cv_bridge is already installed."
+fi
+
+# Install opencv-python in the current Python environment if not already installed
+if ! python3 -c "import cv2" &> /dev/null; then
+    echo "Installing opencv-python via pip..."
+    python3 -m pip install opencv-python
+else
+    echo "opencv-python is already installed."
+fi
+
 # Build the service definitions using colcon
 colcon build --packages-select space_teams_definitions

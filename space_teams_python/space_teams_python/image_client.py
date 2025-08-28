@@ -28,15 +28,7 @@ class ImageClient(Node):
         )
 
     def image_callback(self, msg):
-        self.get_logger().info('Received image')
-        # log the average red pixel values, green pixel values, and blue pixel values
-        averageRed = np.sum(msg.data[0::3]) / (len(msg.data) // 3)
-        averageGreen = np.sum(msg.data[1::3]) / (len(msg.data) // 3)
-        averageBlue = np.sum(msg.data[2::3]) / (len(msg.data) // 3)
-
-        self.get_logger().info(f'Average Red: {averageRed}, Average Green: {averageGreen}, Average Blue: {averageBlue}')
-
-
+        """Callback function to handle incoming image messages"""
         # Process and display the received image
         self.view_image(msg)
 
@@ -48,8 +40,6 @@ class ImageClient(Node):
 
             # Log image information (optional)
             height, width, channels = cv_image.shape
-            self.get_logger().info(f'Image received: {width}x{height}, {channels} channels')
-            self.get_logger().info(f'Image encoding: {image_data.encoding}')
 
             # Display the image using OpenCV (window stays open and updates)
             cv2.imshow('Camera Feed', cv_image)
