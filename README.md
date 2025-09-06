@@ -72,12 +72,12 @@ cd SpaceTeamsROS
 source install/setup.bash
 ```
 
-# build the python package
+build the python package
 ```bash
 colcon build --packages-select space_teams_python
 ```
 
-# Run the example client
+Run the example client
 ```bash
 ros2 run space_teams_python example_client
 ```
