@@ -13,8 +13,6 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/Float.srv"
   "srv/String.srv"
-  "srv/Quaternion.srv"
-  "srv/Vector3d.srv"
   DEPENDENCIES # Add any dependencies here if needed
 )
 
