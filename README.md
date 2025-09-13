@@ -14,10 +14,12 @@ SpaceTeams communicates with ROS 2 through a Python script using `roslibpy`, whi
 ## Prerequisites
 
 - **Operating System**: Linux (Ubuntu in WSL recommended)
+    - If using ROS2 Humble, Ubuntu 22.04 is required (it can be installed in addition to 24.04 if you already have that)
 - **ROS 2**: Any distribution with rosbridge_server support (Humble, Iron, Jazzy, Rolling)
     - To install ROS2 Humble, follow this tutorial: https://docs.ros.org/en/humble/Installation.html
+    - Download the debian packages. Do not build ROS from source
+    - Follow all of the steps in the tutorial and make sure you install ROS Dev tools as well.
 - **Python**: Python 3.6+
-- **Internet connection** for package installation
 
 ## Quick Start
 
@@ -157,11 +159,6 @@ This service accepts a string message and returns a success status. This is used
 
 ### Creating your own client
 
-def get_current_location(self):
-def send_steer_command(self, steer_value):
-def send_accelerator_command(self, accel_value):
-The `example_client.py` provides a good blueprint of what a client node interacting with SpaceTeams should look like. To create your own ROS node that interacts with SpaceTeams, follow these steps:
-
 #### 1. Set up your Python ROS 2 node
 
 Create a new Python file in your package and import the necessary modules:
@@ -188,8 +185,7 @@ class YourRoverController(Node):
         self.steer_client = self.create_client(Float, 'Steer')
         self.accelerator_client = self.create_client(Float, 'Accelerator')
         self.brake_client = self.create_client(Float, 'Brake')
-    # self.location_client = self.create_client(Vector3d, 'GetLocation')  # (Removed, now using topics)
-    # self.rotation_client = self.create_client(Quaternion, 'GetRotation')  # (Removed, now using topics)
+
         # Wait for services to be available
         for client, name in [
             (self.logger_client, 'log_message'),
@@ -213,9 +209,6 @@ def log_message(self, message):
     request.data = message
     future = self.logger_client.call_async(request)
     return future
-
-def get_current_rotation(self):
-## (Removed get_current_location and get_current_rotation service calls; now use topic callbacks)
 
 def send_steer_command(self, steer_value):
     request = Float.Request()
@@ -355,7 +348,6 @@ def main(args=None):
 ### Notes
 - The camera feed is real-time and can be used for navigation, obstacle detection, or logging.
 - You can extend the image client to save images, run ML models, or visualize results.
-- Make sure to install `cv_bridge` and `opencv-python` in your ROS environment.
 
 ## Troubleshooting
 
