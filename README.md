@@ -366,7 +366,8 @@ def main(args=None):
 - Ensure firewall allows port 9090
 
 ### Build Errors
-- Install build dependencies: `sudo apt install python3-colcon-common-extensions`
+- If this error appears when running the first time setup script: `./first_time_setup.bash: line 57: colcon: command not found`
+  - Install build dependencies: `sudo apt install python3-colcon-common-extensions`
 - Clean and rebuild: `rm -rf build install log && colcon build`
 
 ### Permission Denied on Scripts
