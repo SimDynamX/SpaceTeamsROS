@@ -54,7 +54,7 @@ else
 fi
 
 # Build the service definitions using colcon
-colcon build --packages-select space_teams_definitions
+# colcon build --packages-select space_teams_definitions
 
 # Make the run_rosbridge.bash script executable
 chmod +x run_rosbridge.bash
