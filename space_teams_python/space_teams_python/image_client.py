@@ -2,7 +2,7 @@
 from urllib import response
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage, Image
 import sys
 import math
 import time
@@ -21,16 +21,24 @@ class ImageClient(Node):
         self.bridge = CvBridge()
 
         self.subscription = self.create_subscription(
-            Image,
-            'camera/image_raw',
+            CompressedImage,
+            'camera/image_raw/compressed',
             self.image_callback,
             10
         )
 
-    def image_callback(self, msg):
+    def image_callback(self, msg: CompressedImage):
         """Callback function to handle incoming image messages"""
         # Process and display the received image
-        self.view_image(msg)
+        image_msg = self.compressed_to_image(msg)
+        self.view_image(image_msg)
+
+    def compressed_to_image(self, compressed_msg: CompressedImage) -> Image:
+        """Convert CompressedImage message to Image message"""
+        np_arr = np.frombuffer(compressed_msg.data, np.uint8)
+        cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        image_msg = self.bridge.cv2_to_imgmsg(cv_image, encoding='bgr8')
+        return image_msg
 
     def view_image(self, image_data: Image):
         """Process and display the image data as a video stream"""

@@ -19,6 +19,7 @@ SpaceTeams communicates with ROS 2 through a Python script using `roslibpy`, whi
     - To install ROS2 Humble, follow this tutorial: https://docs.ros.org/en/humble/Installation.html
     - Download the debian packages. Do not build ROS from source
     - Follow all of the steps in the tutorial and make sure you install ROS Dev tools as well.
+    - Make sure to install ROS dev tools as well.
 - **Python**: Python 3.6+
 
 ## Quick Start
@@ -281,17 +282,17 @@ SpaceTeams provides a camera feed via ROS 2 image topics, allowing you to access
 ### How to Use the Camera Feed
 
 1. **Subscribe to the Image Topic**
-   - The camera publishes images on the topic `camera/image_raw` using the standard `sensor_msgs/msg/Image` message type.
+   - The camera publishes images on the topic `camera/image_raw/compressed` using the standard `sensor_msgs/msg/CompressedImage` message type.
    - You can subscribe to this topic in your ROS 2 node:
 
    ```python
-   from sensor_msgs.msg import Image
-   self.subscription = self.create_subscription(
-       Image,
-       'camera/image_raw',
-       self.image_callback,
-       10
-   )
+    from sensor_msgs.msg import CompressedImage, Image
+    self.subscription = self.create_subscription(
+        CompressedImage,
+        'camera/image_raw/compressed',
+        self.image_callback,
+        10
+    )
    ```
 
 2. **Process Incoming Images**
@@ -301,8 +302,9 @@ SpaceTeams provides a camera feed via ROS 2 image topics, allowing you to access
    from cv_bridge import CvBridge
    self.bridge = CvBridge()
    def image_callback(self, msg):
-       cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-       # Now you can use OpenCV functions on cv_image
+        #the code for compressed_to_image is in the example image client
+        image_msg = self.compressed_to_image(msg)
+        self.view_image(image_msg)
    ```
 
 3. **Display or Analyze Images**
@@ -314,39 +316,6 @@ SpaceTeams provides a camera feed via ROS 2 image topics, allowing you to access
    cv2.waitKey(1)
    ```
    - You can also analyze pixel values, detect objects, or perform other computer vision tasks
-
-
-### Example: Minimal Image Client
-
-```python
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
-import cv2
-
-class ImageClient(Node):
-    def __init__(self):
-        super().__init__('image_client')
-        self.bridge = CvBridge()
-        self.subscription = self.create_subscription(
-            Image,
-            'camera/image_raw',
-            self.image_callback,
-            10
-        )
-
-    def image_callback(self, msg):
-        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        cv2.imshow('Camera Feed', cv_image)
-        cv2.waitKey(1)
-
-def main(args=None):
-    rclpy.init(args=args)
-    image_client = ImageClient()
-    rclpy.spin(image_client)
-    image_client.destroy_node()
-    rclpy.shutdown()
 ```
 
 ### Notes
