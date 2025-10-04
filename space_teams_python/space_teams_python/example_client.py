@@ -6,6 +6,8 @@ from space_teams_definitions.srv import String, Float
 from geometry_msgs.msg import Point, Quaternion
 import math
 import time
+from space_teams_python.transformations import *
+
 
 class RoverController(Node):
     def __init__(self):
@@ -17,19 +19,23 @@ class RoverController(Node):
         self.brake_client = self.create_client(Float, 'Brake')
 
         # Topic subscriptions
-        self.current_location = None
-        self.current_rotation = None
-        self.create_subscription(Point, 'Location', self.location_callback, 10)
-        self.create_subscription(Quaternion, 'Rotation', self.rotation_callback, 10)
+        self.current_location_marsFrame = None
+        self.current_rotation_marsFrame = None
+        self.current_location_localFrame = None
+        self.current_rotation_localFrame = None
+
+        self.create_subscription(Point, 'LocationMarsFrame', self.location_marsFrame_callback, 10)
+        self.create_subscription(Quaternion, 'RotationMarsFrame', self.rotation_marsFrame_callback, 10)
+        self.create_subscription(Point, 'LocationLocalFrame', self.location_localFrame_callback, 10)
+        self.create_subscription(Quaternion, 'RotationLocalFrame', self.rotation_localFrame_callback, 10)
 
         # Control state
-        self.target_x = None
-        self.target_y = None
+        self.target_loc_localFrame = None
         self.tolerance = 5.0
         self.max_speed = 0.5
         self.navigation_active = False
         self.navigation_iterations = 0
-        self.max_iterations = 1000
+        # self.max_iterations = 1000
         self.initial_move_end_time = None
         self.initial_move_done = False
 
@@ -37,11 +43,17 @@ class RoverController(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.get_logger().info('Rover controller is ready.')
 
-    def location_callback(self, msg):
-        self.current_location = msg
+    def location_marsFrame_callback(self, msg):
+        self.current_location_marsFrame = msg
 
-    def rotation_callback(self, msg):
-        self.current_rotation = msg
+    def rotation_marsFrame_callback(self, msg):
+        self.current_rotation_marsFrame = msg
+
+    def location_localFrame_callback(self, msg):
+        self.current_location_localFrame = msg
+
+    def rotation_localFrame_callback(self, msg):
+        self.current_rotation_localFrame = msg
 
     def log_message(self, message):
         request = String.Request()
@@ -63,37 +75,34 @@ class RoverController(Node):
         request = Float.Request()
         request.data = max(0.0, min(1.0, brake_value))
         return self.brake_client.call_async(request)
+    
+    def calculate_direction_to_target(self, current_loc_localFrame: npt.NDArray, 
+                                      target_loc_localFrame: npt.NDArray) -> npt.NDArray:
+        return normalize(target_loc_localFrame - current_loc_localFrame)
+    
+    def calculate_error_angle_sign(self, vec1: npt.NDArray, vec2: npt.NDArray) -> float:
+        return 1.0 if np.dot(np.cross(vec1, vec2), np.array([0.0, 0.0, 1.0])) > 0.0 else -1.0
+    
+    def calculate_pointing_error_angle(self, current_loc_localFrame: npt.NDArray, 
+                                       target_loc_localFrame: npt.NDArray, current_rot_localFrame: Quat) -> float:
+        m = current_rot_localFrame.to_matrix()
+        forward = m[:, 0]
+        target_direction = self.calculate_direction_to_target(current_loc_localFrame, target_loc_localFrame)
+        error_angle = np.arccos(np.dot(forward, target_direction))
+        error_angle_dir = self.calculate_error_angle_sign(target_direction, forward)
 
-    def quaternion_to_yaw(self, x, y, z, w):
-        siny_cosp = 2 * (w * z + x * y)
-        cosy_cosp = 1 - 2 * (y * y + z * z)
-        return math.atan2(siny_cosp, cosy_cosp)
+        return error_angle_dir * error_angle
 
-    def calculate_bearing_to_target(self, current_x, current_y, target_x, target_y):
-        dx = target_x - current_x
-        dy = target_y - current_y
-        return math.atan2(dy, dx)
+    def calculate_distance_to_target(self, current_loc_localFrame: npt.NDArray, target_loc_localFrame: npt.NDArray):
+        return np.linalg.norm(target_loc_localFrame - current_loc_localFrame)
 
-    def calculate_distance_to_target(self, current_x, current_y, target_x, target_y):
-        dx = target_x - current_x
-        dy = target_y - current_y
-        return math.sqrt(dx*dx + dy*dy)
-
-    def normalize_angle(self, angle):
-        while angle > math.pi:
-            angle -= 2 * math.pi
-        while angle < -math.pi:
-            angle += 2 * math.pi
-        return angle
-
-    def start_navigation(self, target_x, target_y):
-        self.target_x = target_x
-        self.target_y = target_y
+    def start_navigation(self, target_loc_localFrame):
+        self.target_loc_localFrame = target_loc_localFrame
         self.navigation_active = True
         self.navigation_iterations = 0
         self.initial_move_done = False
         self.initial_move_end_time = time.time() + 4.0
-        self.log_message(f"Starting navigation to target: ({target_x:.2f}, {target_y:.2f})")
+        self.log_message(f"Starting navigation to target: ({target_loc_localFrame[0]:.2f}, {target_loc_localFrame[1]:.2f})")
         self.send_accelerator_command(0.5)
 
     def timer_callback(self):
@@ -106,25 +115,31 @@ class RoverController(Node):
                 return
             self.send_accelerator_command(0.0)
             self.initial_move_done = True
+        
         # Navigation logic
-        if self.navigation_iterations >= self.max_iterations:
-            self.log_message("Maximum iterations reached, stopping navigation")
-            self.navigation_active = False
-            return
+        # if self.navigation_iterations >= self.max_iterations:
+        #     self.log_message("Maximum iterations reached, stopping navigation")
+        #     self.navigation_active = False
+        #     return
 
-        if self.current_location is None or self.current_rotation is None:
+        if self.current_location_localFrame is None or self.current_rotation_localFrame is None:
             self.get_logger().info("Waiting for location/rotation update...")
             return
 
-        current_x = self.current_location.x
-        current_y = self.current_location.y
-        current_z = self.current_location.z
-        qx = self.current_rotation.x
-        qy = self.current_rotation.y
-        qz = self.current_rotation.z
-        qw = self.current_rotation.w
+        current_x = float(self.current_location_localFrame.x)
+        current_y = float(self.current_location_localFrame.y)
+        current_z = float(self.current_location_localFrame.z)
 
-        distance = self.calculate_distance_to_target(current_x, current_y, self.target_x, self.target_y)
+        current_loc_localFrame = np.array([current_x, current_y, current_z])
+
+        qx = float(self.current_rotation_localFrame.x)
+        qy = float(self.current_rotation_localFrame.y)
+        qz = float(self.current_rotation_localFrame.z)
+        qw = float(self.current_rotation_localFrame.w)
+
+        current_rot_localFrame = Quat(qw, qx, qy, qz)
+
+        distance = self.calculate_distance_to_target(current_loc_localFrame, self.target_loc_localFrame)
         if distance < self.tolerance:
             self.get_logger().info("Target reached. Sending stop commands.")
             self.send_brake_command(1.0)
@@ -134,9 +149,12 @@ class RoverController(Node):
             self.navigation_active = False
             return
 
-        current_yaw = self.quaternion_to_yaw(qx, qy, qz, qw)
-        target_bearing = self.calculate_bearing_to_target(current_x, current_y, self.target_x, self.target_y)
-        heading_error = self.normalize_angle(target_bearing - current_yaw)
+        # current_yaw = self.quaternion_to_yaw(qx, qy, qz, qw)
+        # target_bearing = self.calculate_bearing_to_target(current_x, current_y, self.target_x, self.target_y)
+        # heading_error = self.normalize_angle(target_bearing - current_yaw)
+
+        heading_error = self.calculate_pointing_error_angle(current_loc_localFrame, self.target_loc_localFrame, 
+                                                            current_rot_localFrame)
         steer_gain = 2.0
         steer_command = max(-1.0, min(1.0, steer_gain * heading_error))
         distance_factor = min(1.0, distance / 50.0)
@@ -157,33 +175,37 @@ class RoverController(Node):
             )
         self.navigation_iterations += 1
 
+
 def main(args=None):
     rclpy.init(args=args)
     rover_controller = RoverController()
 
+    # Test waypoint:
+    waypoint_marsframe = np.array([2194204.77835309, 744500.59464696, -2484601.9468011])
+    waypoint_localframe = np.array([1653.25377054, 185.39849387, -67.70270549])
+
     # Wait for initial location and rotation
     while rclpy.ok():
-        if rover_controller.current_location is not None and rover_controller.current_rotation is not None:
+        if rover_controller.current_location_localFrame is not None and rover_controller.current_rotation_localFrame is not None:
             break
         rover_controller.get_logger().info('Waiting for initial location and rotation...')
         rclpy.spin_once(rover_controller, timeout_sec=0.5)
 
-    current_x = rover_controller.current_location.x
-    current_y = rover_controller.current_location.y
-    current_z = rover_controller.current_location.z
+    current_x = rover_controller.current_location_localFrame.x
+    current_y = rover_controller.current_location_localFrame.y
+    # current_z = rover_controller.current_location_localFrame.z
 
-    target_x = current_x + 100.0
-    target_y = current_y + 100.0
     rover_controller.log_message(
-        f"Starting mission: Moving from ({current_x:.2f}, {current_y:.2f}) to ({target_x:.2f}, {target_y:.2f})"
+        f"Starting navigation: moving from ({current_x:.2f}, {current_y:.2f}) to ({waypoint_localframe[0]:.2f}, {waypoint_localframe[1]:.2f})"
     )
-    rover_controller.start_navigation(target_x, target_y)
+    rover_controller.start_navigation(waypoint_localframe)
 
     try:
         rclpy.spin(rover_controller)
     finally:
         rover_controller.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
