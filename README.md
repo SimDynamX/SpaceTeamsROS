@@ -1,12 +1,12 @@
-# SpaceTeams ROS 2 Integration
+# Space Teams PRO ROS 2 Integration
 
-This repository provides ROS 2 integration for SpaceTeams as well as an example navigation algorithm for the Competition.
+This repository provides ROS 2 integration for Space Teams PRO as well as an example navigation algorithm for the Competition.
 
 ## Overview
 
-SpaceTeams communicates with ROS 2 through a Python script using `roslibpy`, which interfaces with the ROS 2 ecosystem via `rosbridge_server`. This repository provides:
+Space Teams PRO communicates with ROS 2 through a Python script using `roslibpy`, which interfaces with the ROS 2 ecosystem via `rosbridge_server`. This repository provides:
 
-- Custom ROS 2 service definitions for SpaceTeams communication
+- Custom ROS 2 service definitions for Space Teams PRO communication
 - Example Python client demonstrating service usage
 - Setup scripts for easy installation and configuration
 - Bridge setup for UE5 ↔ ROS 2 communication
@@ -62,7 +62,7 @@ This will:
 - Source the local workspace
 - Launch the rosbridge WebSocket server (default port: 9090)
 
-**Keep this terminal running** - SpaceTeams needs the bridge to be active for communication.
+**Keep this terminal running** - Space Teams PRO needs the bridge to be active for communication.
 
 ### 4. Run the demo (Optional)
 
@@ -179,7 +179,7 @@ from geometry_msgs.msg import Point, Quaternion
 
 #### 2. Create service clients
 
-In your node's `__init__` method, create clients for the SpaceTeams services:
+In your node's `__init__` method, create clients for the Space Teams PRO services:
 
 ```python
 class YourRoverController(Node):
@@ -244,7 +244,7 @@ Use the service methods to create your navigation algorithm. The example client 
 
 ## Available Services
 
-SpaceTeams provides the following ROS 2 services for rover control and telemetry:
+Space Teams PRO provides the following ROS 2 services for rover control and telemetry:
 
 ### Control Services
 
@@ -265,7 +265,7 @@ SpaceTeams provides the following ROS 2 services for rover control and telemetry
 
 | Service Name   | Type   | Description                  | Usage                        |
 |---------------|--------|------------------------------|------------------------------|
-| `log_message`  | String | Sends log messages to SpaceTeams | Use for debugging and status reporting |
+| `log_message`  | String | Sends log messages to Space Teams PRO | Use for debugging and status reporting |
 
 ### Service Response Format
 
@@ -277,7 +277,7 @@ Example usage patterns are demonstrated in the `example_client.py` file, which i
 
 ## Camera Features
 
-SpaceTeams provides a camera feed via ROS 2 image topics, allowing you to access and process real-time images from the rover's onboard camera. This is useful for computer vision, navigation, and debugging.
+Space Teams PRO provides a camera feed via ROS 2 image topics, allowing you to access and process real-time images from the rover's onboard camera. This is useful for computer vision, navigation, and debugging.
 
 ### How to Use the Camera Feed
 
@@ -355,7 +355,7 @@ This package supports ROS 2 distributions that include `rosbridge_server`:
 
 ## Competition Notes
 
-This repository serves as a starting template for SpaceTeams competition participants. The service definitions and examples will be expanded and modified throughout the competition development process.
+This repository serves as a starting template for Space Teams University competition participants. The service definitions and examples will be expanded and modified throughout the competition development process.
 
 ## License
 
@@ -363,4 +363,4 @@ Apache License 2.0
 
 ## Support
 
-For SpaceTeams-specific questions, refer to the competition documentation. For ROS 2 issues, consult the [ROS 2 documentation](https://docs.ros.org/en/humble/).
+For questions specific to Space Teams PRO, refer to the competition documentation. For ROS 2 issues, consult the [ROS 2 documentation](https://docs.ros.org/en/humble/).
