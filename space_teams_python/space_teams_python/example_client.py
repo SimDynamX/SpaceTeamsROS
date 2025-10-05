@@ -83,15 +83,24 @@ class RoverController(Node):
     def calculate_error_angle_sign(self, vec1: npt.NDArray, vec2: npt.NDArray) -> float:
         return 1.0 if np.dot(np.cross(vec1, vec2), np.array([0.0, 0.0, 1.0])) > 0.0 else -1.0
     
+    def error_angle_arctan(self, vec1, vec2):
+        up = normalize(np.cross(np.cross(vec2, vec1), vec2))
+        x = np.dot(vec1, vec2)
+        y = np.dot(vec1, up)
+        return np.arctan2(y, x)
+    
     def calculate_pointing_error_angle(self, current_loc_localFrame: npt.NDArray, 
                                        target_loc_localFrame: npt.NDArray, current_rot_localFrame: Quat) -> float:
         m = current_rot_localFrame.to_matrix()
         forward = m[:, 0]
-        target_direction = self.calculate_direction_to_target(current_loc_localFrame, target_loc_localFrame)
-        error_angle = np.arccos(np.dot(forward, target_direction))
-        error_angle_dir = self.calculate_error_angle_sign(target_direction, forward)
+        forward = normalize(np.array([forward[0], forward[1], 0.0]))
 
-        return error_angle_dir * error_angle
+        target_direction = self.calculate_direction_to_target(current_loc_localFrame, target_loc_localFrame)
+        target_direction = normalize(np.array([target_direction[0], target_direction[1], 0.0]))
+
+        error_angle = self.error_angle_arctan(forward, target_direction)
+        # error_angle_dir = self.calculate_error_angle_sign(forward, target_direction)
+        return error_angle
 
     def calculate_distance_to_target(self, current_loc_localFrame: npt.NDArray, target_loc_localFrame: npt.NDArray):
         return np.linalg.norm(target_loc_localFrame - current_loc_localFrame)
@@ -103,7 +112,7 @@ class RoverController(Node):
         self.initial_move_done = False
         self.initial_move_end_time = time.time() + 4.0
         self.log_message(f"Starting navigation to target: ({target_loc_localFrame[0]:.2f}, {target_loc_localFrame[1]:.2f})")
-        self.send_accelerator_command(0.5)
+        self.send_accelerator_command(0.3)
 
     def timer_callback(self):
         if not self.navigation_active:
@@ -153,13 +162,25 @@ class RoverController(Node):
         # target_bearing = self.calculate_bearing_to_target(current_x, current_y, self.target_x, self.target_y)
         # heading_error = self.normalize_angle(target_bearing - current_yaw)
 
+        db_heading = np.deg2rad(5.0)  # deadband for heading alignment
         heading_error = self.calculate_pointing_error_angle(current_loc_localFrame, self.target_loc_localFrame, 
                                                             current_rot_localFrame)
-        steer_gain = 2.0
-        steer_command = max(-1.0, min(1.0, steer_gain * heading_error))
-        distance_factor = min(1.0, distance / 50.0)
-        heading_factor = max(0.3, 1.0 - abs(heading_error) / math.pi)
-        accel_command = self.max_speed * distance_factor * heading_factor
+        
+        # Steering
+        steer_command = remap_clamp(-0.25 * np.pi, 0.25 * np.pi, -1.0, 1.0, heading_error)
+        if abs(heading_error) < db_heading:
+            steer_command = 0.0
+        # steer_command = 0.0
+        # if abs(heading_error) > db_heading:
+        #     steer_command = 1.0 if heading_error > 0.0 else -1.0
+        
+        # Acceleration
+        accel_command = remap_clamp(0.0, 1.0, 0.4, 0.3, abs(steer_command))
+        
+        # Print commands
+        # TODO: doesn't do anything??
+        # self.log_message(f'Steer command = {steer_command:.2f} with a heading error of {np.rad2deg(heading_error):.2f} deg')
+        # self.log_message(f'Acceleration command = {accel_command:.2f}')
 
         self.send_steer_command(steer_command)
         self.send_accelerator_command(accel_command)
@@ -181,8 +202,8 @@ def main(args=None):
     rover_controller = RoverController()
 
     # Test waypoint:
-    waypoint_marsframe = np.array([2194204.77835309, 744500.59464696, -2484601.9468011])
-    waypoint_localframe = np.array([1653.25377054, 185.39849387, -67.70270549])
+    waypoint_marsframe = np.array([2193488.15261938, 743539.37904708, -2485442.33335058])
+    waypoint_localframe = np.array([357.93180313, -494.66781726, -9.49413748])
 
     # Wait for initial location and rotation
     while rclpy.ok():
