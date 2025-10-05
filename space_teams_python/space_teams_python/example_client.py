@@ -98,9 +98,11 @@ class RoverController(Node):
         target_direction = self.calculate_direction_to_target(current_loc_localFrame, target_loc_localFrame)
         target_direction = normalize(np.array([target_direction[0], target_direction[1], 0.0]))
 
-        error_angle = self.error_angle_arctan(forward, target_direction)
-        # error_angle_dir = self.calculate_error_angle_sign(forward, target_direction)
-        return error_angle
+        # error_angle = self.error_angle_arctan(forward, target_direction)
+
+        error_angle = np.arccos(np.dot(forward, target_direction))
+        error_angle_dir = self.calculate_error_angle_sign(target_direction, forward)
+        return error_angle_dir * error_angle
 
     def calculate_distance_to_target(self, current_loc_localFrame: npt.NDArray, target_loc_localFrame: npt.NDArray):
         return np.linalg.norm(target_loc_localFrame - current_loc_localFrame)
@@ -110,9 +112,9 @@ class RoverController(Node):
         self.navigation_active = True
         self.navigation_iterations = 0
         self.initial_move_done = False
-        self.initial_move_end_time = time.time() + 4.0
+        self.initial_move_end_time = time.time() + 10.0
         self.log_message(f"Starting navigation to target: ({target_loc_localFrame[0]:.2f}, {target_loc_localFrame[1]:.2f})")
-        self.send_accelerator_command(0.3)
+        self.send_accelerator_command(0.2)
 
     def timer_callback(self):
         if not self.navigation_active:
@@ -170,19 +172,20 @@ class RoverController(Node):
         steer_command = remap_clamp(-0.25 * np.pi, 0.25 * np.pi, -1.0, 1.0, heading_error)
         if abs(heading_error) < db_heading:
             steer_command = 0.0
+        steer_gain = 1.0
         # steer_command = 0.0
         # if abs(heading_error) > db_heading:
         #     steer_command = 1.0 if heading_error > 0.0 else -1.0
         
         # Acceleration
-        accel_command = remap_clamp(0.0, 1.0, 0.4, 0.3, abs(steer_command))
+        accel_command = remap_clamp(0.0, 1.0, 0.3, 0.2, abs(steer_command))
         
         # Print commands
         # TODO: doesn't do anything??
         # self.log_message(f'Steer command = {steer_command:.2f} with a heading error of {np.rad2deg(heading_error):.2f} deg')
         # self.log_message(f'Acceleration command = {accel_command:.2f}')
 
-        self.send_steer_command(steer_command)
+        self.send_steer_command(-steer_gain * steer_command)
         self.send_accelerator_command(accel_command)
         self.send_brake_command(0.0)
 
