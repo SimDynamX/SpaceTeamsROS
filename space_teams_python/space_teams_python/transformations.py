@@ -50,6 +50,14 @@ def remap_clamp(i_min: float, i_max: float, o_min: float, o_max: float, v: float
     return clamp(o_min, o_max, remap(i_min, i_max, o_min, o_max, v))
 
 
+def kph_to_mps(speed_kph: float) -> float:
+    return speed_kph / 3.6
+
+
+def mps_to_kph(speed_mps: float) -> float:
+    return speed_mps * 3.6
+
+
 class Quat:
     def __init__(self, w: float, x: float, y: float, z: float):
         self.w = w

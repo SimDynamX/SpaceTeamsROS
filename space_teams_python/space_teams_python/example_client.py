@@ -20,13 +20,17 @@ class RoverController(Node):
 
         # Topic subscriptions
         self.current_location_marsFrame = None
+        self.current_velocity_marsFrame = None
         self.current_rotation_marsFrame = None
         self.current_location_localFrame = None
+        self.current_velocity_localFrame = None
         self.current_rotation_localFrame = None
 
         self.create_subscription(Point, 'LocationMarsFrame', self.location_marsFrame_callback, 10)
+        self.create_subscription(Point, 'VelocityMarsFrame', self.velocity_marsFrame_callback, 10)
         self.create_subscription(Quaternion, 'RotationMarsFrame', self.rotation_marsFrame_callback, 10)
         self.create_subscription(Point, 'LocationLocalFrame', self.location_localFrame_callback, 10)
+        self.create_subscription(Point, 'VelocityLocalFrame', self.velocity_localFrame_callback, 10)
         self.create_subscription(Quaternion, 'RotationLocalFrame', self.rotation_localFrame_callback, 10)
 
         # Control state
@@ -45,12 +49,18 @@ class RoverController(Node):
 
     def location_marsFrame_callback(self, msg):
         self.current_location_marsFrame = msg
+    
+    def velocity_marsFrame_callback(self, msg):
+        self.current_velocity_marsFrame = msg
 
     def rotation_marsFrame_callback(self, msg):
         self.current_rotation_marsFrame = msg
 
     def location_localFrame_callback(self, msg):
         self.current_location_localFrame = msg
+
+    def velocity_localFrame_callback(self, msg):
+        self.current_velocity_localFrame = msg
 
     def rotation_localFrame_callback(self, msg):
         self.current_rotation_localFrame = msg
@@ -107,6 +117,9 @@ class RoverController(Node):
     def calculate_distance_to_target(self, current_loc_localFrame: npt.NDArray, target_loc_localFrame: npt.NDArray):
         return np.linalg.norm(target_loc_localFrame - current_loc_localFrame)
 
+    def calculate_speed_difference(self, current_vel_localFrame: npt.NDArray, target_speed_kph: float) -> float:
+        return mps_to_kph(kph_to_mps(target_speed_kph) - np.linalg.norm(current_vel_localFrame))
+
     def start_navigation(self, target_loc_localFrame):
         self.target_loc_localFrame = target_loc_localFrame
         self.navigation_active = True
@@ -128,28 +141,30 @@ class RoverController(Node):
             self.initial_move_done = True
         
         # Navigation logic
-        # if self.navigation_iterations >= self.max_iterations:
-        #     self.log_message("Maximum iterations reached, stopping navigation")
-        #     self.navigation_active = False
-        #     return
-
         if self.current_location_localFrame is None or self.current_rotation_localFrame is None:
             self.get_logger().info("Waiting for location/rotation update...")
             return
 
+        # Get location
         current_x = float(self.current_location_localFrame.x)
         current_y = float(self.current_location_localFrame.y)
         current_z = float(self.current_location_localFrame.z)
-
         current_loc_localFrame = np.array([current_x, current_y, current_z])
 
+        # Get velocity
+        current_vx = float(self.current_velocity_localFrame.x)
+        current_vy = float(self.current_velocity_localFrame.y)
+        current_vz = float(self.current_velocity_localFrame.z)
+        current_vel_localFrame = np.array([current_vx, current_vy, current_vz])
+
+        # Get rotation
         qx = float(self.current_rotation_localFrame.x)
         qy = float(self.current_rotation_localFrame.y)
         qz = float(self.current_rotation_localFrame.z)
         qw = float(self.current_rotation_localFrame.w)
-
         current_rot_localFrame = Quat(qw, qx, qy, qz)
 
+        # Distance to target
         distance = self.calculate_distance_to_target(current_loc_localFrame, self.target_loc_localFrame)
         if distance < self.tolerance:
             self.get_logger().info("Target reached. Sending stop commands.")
@@ -159,12 +174,15 @@ class RoverController(Node):
             self.log_message(f"Target reached! Final position: ({current_x:.2f}, {current_y:.2f})")
             self.navigation_active = False
             return
+        
+        # Velocity error
+        speed_limit_kph = 15.0
+        speed_diff_kph = self.calculate_speed_difference(current_vel_localFrame, speed_limit_kph)  # target - current
+        accel_factor = remap_clamp(0.0, speed_limit_kph, 0.0, 1.0, speed_diff_kph)  # 1 if not moving, 0 if too fast
+        brake_factor = 1.0 - remap_clamp(-speed_limit_kph, 0.0, 0.0, 1.0, speed_diff_kph)  # 0 if <= speed limit, 1 if 2x over
 
-        # current_yaw = self.quaternion_to_yaw(qx, qy, qz, qw)
-        # target_bearing = self.calculate_bearing_to_target(current_x, current_y, self.target_x, self.target_y)
-        # heading_error = self.normalize_angle(target_bearing - current_yaw)
-
-        db_heading = np.deg2rad(5.0)  # deadband for heading alignment
+        # Heading error
+        db_heading = np.deg2rad(3.0)  # deadband for heading alignment
         heading_error = self.calculate_pointing_error_angle(current_loc_localFrame, self.target_loc_localFrame, 
                                                             current_rot_localFrame)
         
@@ -173,21 +191,24 @@ class RoverController(Node):
         if abs(heading_error) < db_heading:
             steer_command = 0.0
         steer_gain = 1.0
-        # steer_command = 0.0
-        # if abs(heading_error) > db_heading:
-        #     steer_command = 1.0 if heading_error > 0.0 else -1.0
+        actual_steer_command = -steer_gain * steer_command
         
         # Acceleration
-        accel_command = remap_clamp(0.0, 1.0, 0.3, 0.2, abs(steer_command))
+        accel_gain = 1.0
+        accel_command = accel_gain * remap_clamp(0.0, 1.0, accel_factor, accel_factor * 0.5, abs(steer_command))
+
+        # Braking
+        brake_gain = 1.0
+        brake_command = brake_gain * brake_factor
         
         # Print commands
         # TODO: doesn't do anything??
-        # self.log_message(f'Steer command = {steer_command:.2f} with a heading error of {np.rad2deg(heading_error):.2f} deg')
-        # self.log_message(f'Acceleration command = {accel_command:.2f}')
+        self.log_message(f'Steer command = {actual_steer_command:.2f} with a heading error of {np.rad2deg(heading_error):.2f} deg')
+        self.log_message(f'Acceleration command = {accel_command:.2f}')
 
-        self.send_steer_command(-steer_gain * steer_command)
+        self.send_steer_command(actual_steer_command)
         self.send_accelerator_command(accel_command)
-        self.send_brake_command(0.0)
+        self.send_brake_command(brake_command)
 
         if self.navigation_iterations % 10 == 0:
             self.log_message(
