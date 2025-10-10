@@ -16,7 +16,9 @@ class RoverController(Node):
         self.logger_client = self.create_client(String, 'log_message')
         self.steer_client = self.create_client(Float, 'Steer')
         self.accelerator_client = self.create_client(Float, 'Accelerator')
+        self.reverse_client = self.create_client(Float, 'Reverse')
         self.brake_client = self.create_client(Float, 'Brake')
+        self.core_sampling_client = self.create_client(Float, 'CoreSample')
 
         # Topic subscriptions
         self.current_location_marsFrame = None
@@ -25,6 +27,7 @@ class RoverController(Node):
         self.current_location_localFrame = None
         self.current_velocity_localFrame = None
         self.current_rotation_localFrame = None
+        self.state = "Driving"
 
         self.create_subscription(Point, 'LocationMarsFrame', self.location_marsFrame_callback, 10)
         self.create_subscription(Point, 'VelocityMarsFrame', self.velocity_marsFrame_callback, 10)
@@ -33,15 +36,20 @@ class RoverController(Node):
         self.create_subscription(Point, 'VelocityLocalFrame', self.velocity_localFrame_callback, 10)
         self.create_subscription(Quaternion, 'RotationLocalFrame', self.rotation_localFrame_callback, 10)
 
+        self.create_subscription(Point, 'CoreSamplingComplete', self.core_sampling_complete_callback, 1)
+
         # Control state
         self.target_loc_localFrame = None
-        self.tolerance = 5.0
+        self.tolerance = 5.0  # meters
         self.max_speed = 0.5
         self.navigation_active = False
         self.navigation_iterations = 0
-        # self.max_iterations = 1000
         self.initial_move_end_time = None
         self.initial_move_done = False
+
+        # Waypoints
+        self.waypoints = None
+        self.current_waypoint_idx = None
 
         # Timer for control loop
         self.timer = self.create_timer(0.1, self.timer_callback)
@@ -64,6 +72,9 @@ class RoverController(Node):
 
     def rotation_localFrame_callback(self, msg):
         self.current_rotation_localFrame = msg
+    
+    def core_sampling_complete_callback(self, msg):
+        self.state = "Driving"
 
     def log_message(self, message):
         request = String.Request()
@@ -81,10 +92,21 @@ class RoverController(Node):
         request.data = max(0.0, min(1.0, accel_value))
         return self.accelerator_client.call_async(request)
 
+    def send_reverse_command(self, reverse_value):
+        request = Float.Request()
+        request.data = max(0.0, min(1.0, reverse_value))
+        return self.reverse_client.call_async(request)
+
     def send_brake_command(self, brake_value):
         request = Float.Request()
         request.data = max(0.0, min(1.0, brake_value))
         return self.brake_client.call_async(request)
+    
+    def send_core_sampling_command(self):
+        self.state = "Sampling"
+        request = Float.Request()
+        request.data = 0.0
+        return self.core_sampling_client.call_async(request)
     
     def calculate_direction_to_target(self, current_loc_localFrame: npt.NDArray, 
                                       target_loc_localFrame: npt.NDArray) -> npt.NDArray:
@@ -167,12 +189,20 @@ class RoverController(Node):
         # Distance to target
         distance = self.calculate_distance_to_target(current_loc_localFrame, self.target_loc_localFrame)
         if distance < self.tolerance:
-            self.get_logger().info("Target reached. Sending stop commands.")
             self.send_brake_command(1.0)
             self.send_steer_command(0.0)
             self.send_accelerator_command(0.0)
-            self.log_message(f"Target reached! Final position: ({current_x:.2f}, {current_y:.2f})")
-            self.navigation_active = False
+            self.log_message(f"Target reached! Beginning core sampling at position: ({current_x:.2f}, {current_y:.2f})")
+            self.send_core_sampling_command()
+
+            if self.current_waypoint_idx == len(self.waypoints) - 1:
+                self.navigation_active = False
+                self.log_message("Navigation complete: all waypoints reached and all core samples collected.")
+            else:
+                self.current_waypoint_idx += 1
+                self.target_loc_localFrame = self.waypoints[self.current_waypoint_idx]
+                next_loc = f"({self.target_loc_localFrame[0]:.2f}, {self.target_loc_localFrame[1]:.2f})"
+                self.log_message(f"After sampling, moving to next waypoint at: {next_loc}")
             return
         
         # Velocity error
@@ -198,26 +228,26 @@ class RoverController(Node):
         accel_command = accel_gain * remap_clamp(0.0, 1.0, accel_factor, accel_factor * 0.5, abs(steer_command))
 
         # Braking
+        # If brake, brake_command > 0.5 results in braking (i.e., boolean behavior)
+        # If reverse, float value between 0 and 1 is passed, acts as a gradual deceleration
         brake_gain = 1.0
         brake_command = brake_gain * brake_factor
-        
-        # Print commands
-        # TODO: doesn't do anything??
-        self.log_message(f'Steer command = {actual_steer_command:.2f} with a heading error of {np.rad2deg(heading_error):.2f} deg')
-        self.log_message(f'Acceleration command = {accel_command:.2f}')
 
         self.send_steer_command(actual_steer_command)
         self.send_accelerator_command(accel_command)
-        self.send_brake_command(brake_command)
+        self.send_reverse_command(brake_command)  # Send brake command as a float (reverse)
+        self.send_brake_command(0.0)
+        # self.send_brake_command(brake_command)  # Send brake command as a bool
 
-        if self.navigation_iterations % 10 == 0:
-            self.log_message(
-                f"Position: ({current_x:.2f}, {current_y:.2f}), "
-                f"Distance: {distance:.2f}, "
-                f"Heading error: {math.degrees(heading_error):.1f}°, "
-                f"Steer: {steer_command:.2f}, "
-                f"Accel: {accel_command:.2f}"
-            )
+        # Print commands for debugging:
+        # if self.navigation_iterations % 10 == 0:
+        #     self.log_message(
+        #         f"Position: ({current_x:.2f}, {current_y:.2f}), "
+        #         f"Distance: {distance:.2f}, "
+        #         f"Heading error: {math.degrees(heading_error):.1f} deg, "
+        #         f"Steer: {steer_command:.2f}, "
+        #         f"Accel: {accel_command:.2f}"
+        #     )
         self.navigation_iterations += 1
 
 
@@ -226,8 +256,14 @@ def main(args=None):
     rover_controller = RoverController()
 
     # Test waypoint:
-    waypoint_marsframe = np.array([2193488.15261938, 743539.37904708, -2485442.33335058])
-    waypoint_localframe = np.array([357.93180313, -494.66781726, -9.49413748])
+    # waypoint_marsframe = np.array([2193073.87847882, 743984.99629174, -2485667.65565136])
+    # waypoint_localframe = np.array([22.0285988, 60.41062071, -4.50449595])
+
+    # Test multiple waypoints:
+    waypoints_localFrame = [
+        np.array([22.0285988, 60.41062071, -4.50449595]),
+        np.array([-404.64432933, 3.8770865, -18.18814408])
+    ]
 
     # Wait for initial location and rotation
     while rclpy.ok():
@@ -238,12 +274,15 @@ def main(args=None):
 
     current_x = rover_controller.current_location_localFrame.x
     current_y = rover_controller.current_location_localFrame.y
-    # current_z = rover_controller.current_location_localFrame.z
+
+    rover_controller.waypoints = waypoints_localFrame
+    rover_controller.current_waypoint_idx = 0
 
     rover_controller.log_message(
-        f"Starting navigation: moving from ({current_x:.2f}, {current_y:.2f}) to ({waypoint_localframe[0]:.2f}, {waypoint_localframe[1]:.2f})"
+        f"Starting navigation: moving from ({current_x:.2f}, {current_y:.2f}) to ({waypoints_localFrame[0][0]:.2f}, {waypoints_localFrame[0][1]:.2f})"
     )
-    rover_controller.start_navigation(waypoint_localframe)
+    
+    rover_controller.start_navigation(waypoints_localFrame[0])
 
     try:
         rclpy.spin(rover_controller)
