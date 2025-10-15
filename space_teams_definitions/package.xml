@@ -3,8 +3,8 @@
 <package format="3">
   <name>space_teams_definitions</name>
   <version>0.0.0</version>
-  <description>Service definitions for SpaceTeams project</description>
-  <maintainer email="yotam@todo.todo">yotam</maintainer>
+  <description>Service definitions for SpaceTeams project. https://github.com/SimDynamX/SpaceTeamsROS</description>
+  <maintainer email="support@simdynamx.com">SimDynamX</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

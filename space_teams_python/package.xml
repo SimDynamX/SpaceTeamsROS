@@ -3,8 +3,8 @@
 <package format="3">
   <name>space_teams_python</name>
   <version>0.0.0</version>
-  <description>Python ROS2 package for SpaceTeams project with logger_info service</description>
-  <maintainer email="yotam@todo.todo">yotam</maintainer>
+  <description>Python ROS2 package for SpaceTeams project with logger_info service. https://github.com/SimDynamX/SpaceTeamsROS</description>
+  <maintainer email="support@simdynamx.com">SimDynamX</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
