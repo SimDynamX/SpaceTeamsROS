@@ -100,7 +100,8 @@ import subprocess
 class TopicConfig:
     name: str
     qos_history_depth: int = 5  # Keep more messages in history
-    qos_reliability: int = rclpy.qos.ReliabilityPolicy.BEST_EFFORT  # Best effort for real-time
+    # qos_reliability: int = rclpy.qos.ReliabilityPolicy.BEST_EFFORT  # Best effort for real-time
+    qos_reliability: int = rclpy.qos.ReliabilityPolicy.RELIABLE  # Reliable delivery
     qos_durability: int = rclpy.qos.DurabilityPolicy.VOLATILE  # No need to store
 
 class ImageSubscriber(Node):
@@ -264,24 +265,46 @@ class ImageSubscriber(Node):
                 raise ValueError(f"Image data size mismatch. Expected {expected_size} bytes, got {len(img_data)} bytes")
             
             # Convert to numpy array
-            frame = np.frombuffer(img_data, dtype=np.uint8).reshape((height, width, channels))
-            
+            img_dtype = np.uint8 if frame_type in ["RGB"] else np.float32
+            frame = np.frombuffer(img_data, dtype=img_dtype).reshape((height, width, channels))
+
             # Convert to ROS message
-            if frame_type in self.my_publishers:
-                # Pre-allocate header for optimization
-                msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
-                msg.header.stamp = self.get_clock().now().to_msg()
-                msg.header.frame_id = frame_type.lower() + "_camera"
-                self.my_publishers[frame_type].publish(msg)
+            if not frame_type in self.my_publishers:
+                self.get_logger().warning(f"Received frame of unknown type: {frame_type}")
+            else:
+                if frame_type == "RGB":
+                    # Pre-allocate header for optimization
+                    msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+                    msg.header.stamp = self.get_clock().now().to_msg()
+                    msg.header.frame_id = frame_type.lower() + "_camera"
+                    self.my_publishers[frame_type].publish(msg)
+                    self.get_logger().info(f"DEBUG: One frame published to {frame_type} topic")
+                    
+                    # Update statistics (less frequently to reduce overhead)
+                    self.frames_count[frame_type] += 1
+                    current_time = time.time()
+                    if current_time - self.last_time[frame_type] > 2.0:  # Update every 2 seconds
+                        fps = self.frames_count[frame_type] / (current_time - self.last_time[frame_type])
+                        self.get_logger().info(f"{frame_type} FPS: {fps:.1f}")
+                        self.frames_count[frame_type] = 0
+                        self.last_time[frame_type] = current_time
+                elif frame_type == "DEPTH":
+                    # Pre-allocate header for optimization
+                    msg = self.bridge.cv2_to_imgmsg(frame, encoding='32FC1')
+                    msg.header.stamp = self.get_clock().now().to_msg()
+                    msg.header.frame_id = frame_type.lower() + "_camera"
+                    self.my_publishers[frame_type].publish(msg)
+                    self.get_logger().info(f"DEBUG: One frame published to {frame_type} topic")
+                    
+                    # Update statistics (less frequently to reduce overhead)
+                    self.frames_count[frame_type] += 1
+                    current_time = time.time()
+                    if current_time - self.last_time[frame_type] > 2.0:  # Update every 2 seconds
+                        fps = self.frames_count[frame_type] / (current_time - self.last_time[frame_type])
+                        self.get_logger().info(f"{frame_type} FPS: {fps:.1f}")
+                        self.frames_count[frame_type] = 0
+                        self.last_time[frame_type] = current_time
                 
-                # Update statistics (less frequently to reduce overhead)
-                self.frames_count[frame_type] += 1
-                current_time = time.time()
-                if current_time - self.last_time[frame_type] > 2.0:  # Update every 2 seconds
-                    fps = self.frames_count[frame_type] / (current_time - self.last_time[frame_type])
-                    self.get_logger().info(f"{frame_type} FPS: {fps:.1f}")
-                    self.frames_count[frame_type] = 0
-                    self.last_time[frame_type] = current_time
                     
         except Exception as e:
             error_msg = f"Error processing frame: {str(e)}"
@@ -293,13 +316,14 @@ class ImageSubscriber(Node):
         """Timer callback to receive and process frames as fast as possible."""
         if not self.connected:
             return
-            
+        
         try:
             # Process messages as fast as possible
             for _ in range(100):  # Process up to 100 messages per callback
                 try:
                     frame_data = self._zmq_socket.recv(flags=zmq.NOBLOCK)
                     self._process_frame(frame_data)
+                    self.get_logger().info("Processing a frame")
                 except zmq.Again:
                     return  # No more messages
                     
