@@ -46,6 +46,7 @@ This script will:
 - Install `rosbridge_server` if not already installed
 - Install `cv_bridge` (ROS package) if not already installed
 - Install `opencv-python` (Python package) if not already installed
+- Initialize and set up `rosdep` to install a few more packages
 - Build the `space_teams_definitions` package using colcon
 
 ### 3. Start the ROS Bridge
