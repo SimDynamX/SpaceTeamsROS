@@ -69,13 +69,14 @@ This will:
 Make sure that rosbridge is still running and start the Competition sim.
 After choosing a pawn, open up linux another terminal run the example client:
 
+Ensure you're in the `SpaceTeamsROS` directory.
+
 Source your workspace
 ```bash
-cd SpaceTeamsROS
 source install/setup.bash
 ```
 
-build the python package
+Build the python package
 ```bash
 colcon build --packages-select space_teams_python
 ```
