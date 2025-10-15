@@ -6,6 +6,7 @@
 #     exit 1
 # fi
 
+echo "[ST] Checking ROS distribution"
 # Try to detect ROS_DISTRO by searching for installed ROS 2 distributions
 if [ -z "$ROS_DISTRO" ]; then
     # Look for setup.bash files in /opt/ros and pick the first one found
@@ -15,46 +16,51 @@ if [ -z "$ROS_DISTRO" ]; then
 fi
 
 if [ -z "$ROS_DISTRO" ]; then
-    echo "Could not determine ROS 2 distribution. Please ensure ROS 2 is installed in /opt/ros."
+    echo "[ST] Could not determine ROS 2 distribution. Please ensure ROS 2 is installed in /opt/ros."
     exit 1
+else
+    echo "[ST] ROS 2 Distribution set properly ($ROS_DISTRO)."
 fi
 
 # try to source the ROS 2 setup.bash
 if [ -f "/opt/ros/$ROS_DISTRO/setup.bash" ]; then
+    echo "[ST] Sourcing ros setup at /opt/ros/$ROS_DISTRO/setup.bash ..."
     source "/opt/ros/$ROS_DISTRO/setup.bash"
 else
-    echo "Could not find /opt/ros/$ROS_DISTRO/setup.bash. Please check your ROS 2 installation."
+    echo "[ST] Could not find /opt/ros/$ROS_DISTRO/setup.bash. Please check your ROS 2 installation."
     exit 1
 fi
 
 #install rosbridge if not already installed
-if ! ros2 pkg list | grep -q rosbridge_server; then
-    echo "Installing rosbridge_server..."
+if ! ros2 pkg prefix rosbridge_server >/dev/null 2>&1; then
+    echo "[ST] Installing rosbridge_server..."
     sudo apt update
     sudo apt install -y ros-$ROS_DISTRO-rosbridge-server
 else
-    echo "rosbridge_server is already installed."
+    echo "[ST] rosbridge_server is already installed."
 fi
 
 # Install cv_bridge if not already installed
-if ! ros2 pkg list | grep -q cv_bridge; then
-    echo "Installing cv_bridge..."
+if ! ros2 pkg prefix cv_bridge >/dev/null 2>&1; then
+    echo "[ST] Installing cv_bridge..."
     sudo apt update
     sudo apt install -y ros-$ROS_DISTRO-cv-bridge
 else
-    echo "cv_bridge is already installed."
+    echo "[ST] cv_bridge is already installed."
 fi
 
 # Install opencv-python in the current Python environment if not already installed
 if ! python3 -c "import cv2" &> /dev/null; then
-    echo "Installing opencv-python via pip..."
+    echo "[ST] Installing opencv-python via pip..."
     python3 -m pip install opencv-python
 else
-    echo "opencv-python is already installed."
+    echo "[ST] opencv-python is already installed."
 fi
 
 # Build the service definitions using colcon
+echo "[ST] Doing colcon build of space_teams_definitions..."
 colcon build --packages-select space_teams_definitions
+echo "[ST] Colcon build of space_teams_definitions done."
 
 # Make the run_rosbridge.bash script executable
 chmod +x run_rosbridge.bash
