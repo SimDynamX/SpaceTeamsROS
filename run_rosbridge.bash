@@ -15,7 +15,7 @@ if [ -z "$ROS_DISTRO" ]; then
 fi
 
 if [ -z "$ROS_DISTRO" ]; then
-    echo "Could not determine ROS 2 distribution. Please ensure ROS 2 is installed in /opt/ros."
+    echo "[ST] Could not determine ROS 2 distribution. Please ensure ROS 2 is installed in /opt/ros."
     exit 1
 fi
 
@@ -23,9 +23,10 @@ fi
 if [ -f "/opt/ros/$ROS_DISTRO/setup.bash" ]; then
     source "/opt/ros/$ROS_DISTRO/setup.bash"
 else
-    echo "Could not find /opt/ros/$ROS_DISTRO/setup.bash. Please check your ROS 2 installation."
+    echo "[ST] Could not find /opt/ros/$ROS_DISTRO/setup.bash. Please check your ROS 2 installation."
     exit 1
 fi
 
+echo "[ST] Launching rosbridge_server..."
 source install/setup.bash
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
