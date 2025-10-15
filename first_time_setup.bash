@@ -49,6 +49,13 @@ else
     echo "[ST] cv_bridge is already installed."
 fi
 
+# echo "[ST] Ensuring python pip packages are installed..."
+
+# python3 -m ensurepip
+# python3 -m pip install opencv-python zmq numpy
+
+# echo "[ST] Done with python pip packages."
+
 # Install opencv-python in the current Python environment if not already installed
 if ! python3 -c "import cv2" &> /dev/null; then
     echo "[ST] Installing opencv-python via pip..."
@@ -56,6 +63,19 @@ if ! python3 -c "import cv2" &> /dev/null; then
 else
     echo "[ST] opencv-python is already installed."
 fi
+
+# # Install zmq in the current Python environment if not already installed
+# if ! python3 -c "import zmq" &> /dev/null; then
+#     echo "[ST] Installing zmq via pip..."
+#     python3 -m pip install zmq
+# else
+#     echo "[ST] zmq is already installed."
+# fi
+
+# rosdep setup
+sudo rosdep init
+rosdep update
+rosdep install --from-paths space_teams_python --ignore-src -r -y
 
 # Build the service definitions using colcon
 echo "[ST] Doing colcon build of space_teams_definitions..."

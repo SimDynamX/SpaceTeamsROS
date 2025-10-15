@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>space_teams_definitions</depend>
+  <depend>python3-zmq</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
