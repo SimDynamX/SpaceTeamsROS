@@ -46,6 +46,7 @@ This script will:
 - Install `rosbridge_server` if not already installed
 - Install `cv_bridge` (ROS package) if not already installed
 - Install `opencv-python` (Python package) if not already installed
+- Initialize and set up `rosdep` to install a few more packages
 - Build the `space_teams_definitions` package using colcon
 
 ### 3. Start the ROS Bridge
@@ -64,10 +65,11 @@ This will:
 
 **Keep this terminal running** - Space Teams PRO needs the bridge to be active for communication.
 
-### 4. Run the demo (Optional)
+### 4. Run the example client
 
-Make sure that rosbridge is still running and start the Competition sim.
-After choosing a pawn, open up linux another terminal run the example client:
+- Make sure that rosbridge is still running
+- Start the Competition sim in Space Teams PRO.
+- After choosing a role in STP, open up another WSL terminal to run the example client:
 
 Ensure you're in the `SpaceTeamsROS` directory.
 
