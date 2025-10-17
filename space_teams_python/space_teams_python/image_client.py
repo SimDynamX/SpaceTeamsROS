@@ -232,11 +232,11 @@ class ImageSubscriber(Node):
             else:
                 if frame_type == "RGB":
                     # Pre-allocate header for optimization
-                    msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+                    msg = self.bridge.cv2_to_imgmsg(frame, encoding='rgb8')
                     msg.header.stamp = self.get_clock().now().to_msg()
                     msg.header.frame_id = frame_type.lower() + "_camera"
                     self.my_publishers[frame_type].publish(msg)
-                    self.get_logger().info(f"DEBUG: One frame published to {frame_type} topic")
+                    # self.get_logger().info(f"DEBUG: One frame published to {frame_type} topic")
                     
                     # Update statistics (less frequently to reduce overhead)
                     self.frames_count[frame_type] += 1
@@ -252,7 +252,7 @@ class ImageSubscriber(Node):
                     msg.header.stamp = self.get_clock().now().to_msg()
                     msg.header.frame_id = frame_type.lower() + "_camera"
                     self.my_publishers[frame_type].publish(msg)
-                    self.get_logger().info(f"DEBUG: One frame published to {frame_type} topic")
+                    # self.get_logger().info(f"DEBUG: One frame published to {frame_type} topic")
                     
                     # Update statistics (less frequently to reduce overhead)
                     self.frames_count[frame_type] += 1
