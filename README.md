@@ -88,7 +88,7 @@ Run the example client
 ros2 run space_teams_python example_client
 ```
 
-Run the image receiver
+Run the image receiver (in another terminal window, TBD better way to launch this)
 ```bash
 ros2 run space_teams_python image_client
 ```
