@@ -88,6 +88,11 @@ Run the example client
 ros2 run space_teams_python example_client
 ```
 
+Run the image receiver
+```bash
+ros2 run space_teams_python image_client
+```
+
 ## Repository Structure
 
 ```
