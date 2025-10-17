@@ -13,14 +13,15 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='yotam',
-    maintainer_email='yotam@todo.todo',
-    description='Python ROS2 package for SpaceTeams project with logger_info service',
+    maintainer='SimDynamX',
+    maintainer_email='support@simdynamx.com',
+    description='Python ROS2 package for SpaceTeams project with logger_info service. https://github.com/SimDynamX/SpaceTeamsROS',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'example_client = space_teams_python.example_client:main',
+            'image_client = space_teams_python.image_client:main',
         ],
     },
 )

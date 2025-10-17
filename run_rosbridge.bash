@@ -3,7 +3,21 @@
 if [ -z "$ROS_DISTRO" ] && [ -d "/opt/ros" ]; then
     ROS_DISTRO=$(ls /opt/ros | head -n 1)
 fi
-source /opt/ros/$ROS_DISTRO/setup.bash
+
+if [ -z "$ROS_DISTRO" ]; then
+    echo "[ST] Could not determine ROS 2 distribution. Please ensure ROS 2 is installed in /opt/ros."
+    exit 1
+fi
+
+# try to source the ROS 2 setup.bash
+if [ -f "/opt/ros/$ROS_DISTRO/setup.bash" ]; then
+    source "/opt/ros/$ROS_DISTRO/setup.bash"
+else
+    echo "[ST] Could not find /opt/ros/$ROS_DISTRO/setup.bash. Please check your ROS 2 installation."
+    exit 1
+fi
+
+echo "[ST] Launching rosbridge_server..."
 source install/setup.bash
 
 # Set up cleanup
