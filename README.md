@@ -113,7 +113,7 @@ SpaceTeamsROS/
     └── space_teams_python/
         ├── __init__.py
         ├── example_client.py       # Demo navigation algorithm
-        └── image_client.py         # Demo camera usage
+        └── image_client.py         # RGB/Depth Image republisher
 ```
 
 ## Service Definitions
