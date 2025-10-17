@@ -53,6 +53,14 @@ else
     echo "opencv-python is already installed."
 fi
 
+# install pyzmq if not already installed
+if ! python3 -c "import zmq" &> /dev/null; then
+    echo "Installing pyzmq via pip..."
+    python3 -m pip install pyzmq
+else
+    echo "pyzmq is already installed."
+fi
+
 # Build the service definitions using colcon
 colcon build --packages-select space_teams_definitions
 
