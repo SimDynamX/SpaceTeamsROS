@@ -1,89 +1,3 @@
-
-
-##### OLD CODE BELOW - KEEP FOR REFERENCE #####
-'''
-from urllib import response
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import CompressedImage, Image
-import sys
-import math
-import time
-import cv2
-import numpy as np
-from cv_bridge import CvBridge
-import matplotlib.pyplot as plt
-
-class ImageClient(Node):
-    def __init__(self):
-        super().__init__('image_client')
-
-        self.get_logger().info('Image client is starting...')
-        
-        # Initialize the CvBridge for converting ROS Image messages to OpenCV format
-        self.bridge = CvBridge()
-
-        self.subscription = self.create_subscription(
-            CompressedImage,
-            'camera/image_raw/compressed',
-            self.image_callback,
-            10
-        )
-
-    def image_callback(self, msg: CompressedImage):
-        """Callback function to handle incoming image messages"""
-        # Process and display the received image
-        image_msg = self.compressed_to_image(msg)
-        self.view_image(image_msg)
-
-    def compressed_to_image(self, compressed_msg: CompressedImage) -> Image:
-        """Convert CompressedImage message to Image message"""
-        np_arr = np.frombuffer(compressed_msg.data, np.uint8)
-        cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        image_msg = self.bridge.cv2_to_imgmsg(cv_image, encoding='bgr8')
-        return image_msg
-
-    def view_image(self, image_data: Image):
-        """Process and display the image data as a video stream"""
-        try:
-            # Convert ROS Image message to OpenCV format
-            cv_image = self.bridge.imgmsg_to_cv2(image_data, desired_encoding='bgr8')
-
-            # Log image information (optional)
-            height, width, channels = cv_image.shape
-
-            # Display the image using OpenCV (window stays open and updates)
-            cv2.imshow('Camera Feed', cv_image)
-            # Use a small waitKey to keep the window responsive
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                # Optional: allow user to close window with 'q'
-                cv2.destroyAllWindows()
-
-        except Exception as e:
-            self.get_logger().error(f'Error processing image: {str(e)}')
-    
-    def destroy_node(self):
-        """Clean up resources when the node is destroyed"""
-        cv2.destroyAllWindows()
-        super().destroy_node()
-
-
-def main(args=None):
-    rclpy.init(args=args)
-
-    image_client = ImageClient()
-    rclpy.spin(image_client)
-    
-    image_client.destroy_node()
-    rclpy.shutdown()
-
-'''
-
-
-
-
-
-
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -95,13 +9,13 @@ import time
 from typing import Dict, Optional
 from dataclasses import dataclass
 import subprocess
+import socket
 
 @dataclass
 class TopicConfig:
     name: str
     qos_history_depth: int = 5  # Keep more messages in history
-    # qos_reliability: int = rclpy.qos.ReliabilityPolicy.BEST_EFFORT  # Best effort for real-time
-    qos_reliability: int = rclpy.qos.ReliabilityPolicy.RELIABLE  # Reliable delivery
+    qos_reliability: int = rclpy.qos.ReliabilityPolicy.BEST_EFFORT  # Best effort for real-time
     qos_durability: int = rclpy.qos.DurabilityPolicy.VOLATILE  # No need to store
 
 class ImageSubscriber(Node):
@@ -156,29 +70,42 @@ class ImageSubscriber(Node):
         period = 0.0001  # 10kHz - effectively as fast as possible
         self.timer = self.create_timer(period, self.timer_callback)
         self.get_logger().info("Image subscriber started - Processing at maximum rate")
-        
+
     def _setup_zmq_subscriber(self) -> None:
         """Setup and configure ZMQ subscriber socket."""
         self._zmq_context = zmq.Context()
         self._zmq_context.setsockopt(zmq.MAX_SOCKETS, 1)
         self._zmq_socket = self._zmq_context.socket(zmq.SUB)
-        
-        # Configure socket for high-performance streaming
-        self._zmq_socket.setsockopt(zmq.RCVHWM, 2)  # Small HWM to prevent memory growth
-        self._zmq_socket.setsockopt(zmq.LINGER, 0)  # Don't wait on close
-        self._zmq_socket.setsockopt(zmq.CONFLATE, 1)  # Only keep latest message
-        self._zmq_socket.setsockopt(zmq.TCP_KEEPALIVE, 1)  # Keep connection alive
-        self._zmq_socket.setsockopt(zmq.TCP_KEEPALIVE_IDLE, 120)  # Faster keepalive
-        self._zmq_socket.setsockopt(zmq.RCVBUF, 2*1024*1024)  # 2MB receive buffer
-        self._zmq_socket.setsockopt(zmq.RCVTIMEO, 1000)  # 1 second receive timeout
-        
-        # Subscribe to all messages (we'll filter them after receiving)
+
+        # High-throughput, bounded, latest-only receive
+        self._zmq_socket.setsockopt(zmq.RCVHWM, 2)
+        self._zmq_socket.setsockopt(zmq.LINGER, 0)
+        self._zmq_socket.setsockopt(zmq.CONFLATE, 1)     # latest only (lossy)
+        self._zmq_socket.setsockopt(zmq.TCP_KEEPALIVE, 1)
+        self._zmq_socket.setsockopt(zmq.TCP_KEEPALIVE_IDLE, 120)
+        self._zmq_socket.setsockopt(zmq.RCVBUF, 2*1024*1024)
+        self._zmq_socket.setsockopt(zmq.RCVTIMEO, 1000)  # 1s recv timeout
+
+        # Subscribe to everything (your code filters after recv)
         self._zmq_socket.setsockopt(zmq.SUBSCRIBE, b"")
-        
-        # Connect to the Windows host
+
+        # ---> Key change: use the Windows default-gateway IP
         windows_ip = self._get_windows_ip()
-        connect_address = f"tcp://{windows_ip}:5555"
+        if not windows_ip:
+            self.get_logger().error("Failed to detect Windows host IP; pass-through disabled.")
+            return
+
+        connect_address = f"tcp://{windows_ip}:55556"
         self.get_logger().info(f"Connecting to publisher at {connect_address}")
+
+        # Optional: do a fast TCP probe so failures are obvious
+        tcp_ok = self._tcp_probe(windows_ip, 55556, timeout=2.0)
+        if tcp_ok:
+            self.get_logger().info(f"TCP probe to {windows_ip}:55556 OK.")
+        else:
+            self.get_logger().error(f"TCP probe to {windows_ip}:55556 failed (firewall/bind?).")
+            return
+
         try:
             self._zmq_socket.connect(connect_address)
             self.get_logger().info(f"Successfully connected to {connect_address}")
@@ -187,15 +114,46 @@ class ImageSubscriber(Node):
             self.get_logger().error(f"Failed to connect: {e}")
             return
 
+
     def _get_windows_ip(self) -> str:
-        """Get the IP address of the Windows host from WSL."""
+        """WSL2: Windows host is the default gateway."""
         try:
-            result = subprocess.run(['cat', '/etc/resolv.conf'], capture_output=True, text=True)
-            nameserver_line = [line for line in result.stdout.split('\n') if 'nameserver' in line][0]
-            return nameserver_line.split()[1]
+            out = subprocess.check_output(["/sbin/ip", "route"], text=True)
+            for line in out.splitlines():
+                if line.startswith("default "):
+                    parts = line.split()
+                    gw = parts[2]  # default via <gw>
+                    socket.inet_aton(gw)  # validate IPv4
+                    return gw
         except Exception as e:
-            self.get_logger().error(f"Failed to get Windows IP: {str(e)}")
-            return "172.17.0.1"  # Common WSL2 default
+            self.get_logger().warn(f"Default gateway detection failed: {e}")
+
+        # Fallbacks (less reliable but harmless)
+        try:
+            return socket.gethostbyname("host.docker.internal")
+        except Exception:
+            pass
+        try:
+            with open("/etc/resolv.conf", "r") as f:
+                for line in f:
+                    if line.startswith("nameserver"):
+                        cand = line.split()[1].strip()
+                        socket.inet_aton(cand)
+                        return cand
+        except Exception:
+            pass
+
+        # Last resort: caller should override
+        return ""
+    
+    def _tcp_probe(self, host: str, port: int, timeout: float = 2.0) -> bool:
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except Exception:
+            return False
+
+
 
     def _setup_publishers(self) -> None:
         """Setup ROS publishers for different image types with optimized QoS settings."""
