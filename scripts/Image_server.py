@@ -54,7 +54,7 @@ class ImageSubscriber(Node):
         # Create timer for receiving images at maximum possible rate
         period = 0.0001  # 10kHz - effectively as fast as possible
         self.timer = self.create_timer(period, self.timer_callback)
-        self.get_logger().info("Image subscriber started - Processing at maximum rate")
+        print("Image subscriber started - Processing at maximum rate")
         
     def _setup_zmq_subscriber(self) -> None:
         """Setup and configure ZMQ subscriber socket."""
@@ -77,10 +77,10 @@ class ImageSubscriber(Node):
         # Connect to the Windows host
         windows_ip = self._get_windows_ip()
         connect_address = f"tcp://{windows_ip}:5555"
-        self.get_logger().info(f"Connecting to publisher at {connect_address}")
+        print(f"Connecting to publisher at {connect_address}")
         try:
             self._zmq_socket.connect(connect_address)
-            self.get_logger().info(f"Successfully connected to {connect_address}")
+            print(f"Successfully connected to {connect_address}")
             self.connected = True
         except Exception as e:
             self.get_logger().error(f"Failed to connect: {e}")
@@ -190,13 +190,14 @@ class ImageSubscriber(Node):
                 msg.header.stamp = self.get_clock().now().to_msg()
                 msg.header.frame_id = frame_type.lower() + "_camera"
                 self.my_publishers[frame_type].publish(msg)
+                print(f"Published {frame_type} frame: {width}x{height}, Channels: {channels}")
                 
                 # Update statistics (less frequently to reduce overhead)
                 self.frames_count[frame_type] += 1
                 current_time = time.time()
                 if current_time - self.last_time[frame_type] > 2.0:  # Update every 2 seconds
                     fps = self.frames_count[frame_type] / (current_time - self.last_time[frame_type])
-                    self.get_logger().info(f"{frame_type} FPS: {fps:.1f}")
+                    print(f"{frame_type} FPS: {fps:.1f}")
                     self.frames_count[frame_type] = 0
                     self.last_time[frame_type] = current_time
                     
