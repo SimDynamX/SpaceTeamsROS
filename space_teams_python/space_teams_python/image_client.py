@@ -218,7 +218,7 @@ class ImageSubscriber(Node):
             img_data = frame_data[header_end + 1:]
             
             # Verify we have enough data
-            expected_size = height * width * channels
+            expected_size = height * width * channels * (1 if frame_type in ["RGB"] else 4)
             if len(img_data) != expected_size:
                 raise ValueError(f"Image data size mismatch. Expected {expected_size} bytes, got {len(img_data)} bytes")
             
@@ -281,7 +281,6 @@ class ImageSubscriber(Node):
                 try:
                     frame_data = self._zmq_socket.recv(flags=zmq.NOBLOCK)
                     self._process_frame(frame_data)
-                    self.get_logger().info("Processing a frame")
                 except zmq.Again:
                     return  # No more messages
                     
