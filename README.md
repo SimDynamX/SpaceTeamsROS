@@ -254,6 +254,79 @@ Run the launch file as normal, and your custom node will start alongside the ros
 ros2 launch space_teams_python rosbridge_image_client.launch.py
 ```
 
+### Adding New Nodes to setup.py
+
+When you create a new Python node for your ROS 2 package, you need to register it in `setup.py` to make it available via the `ros2 run` command. This is crucial for making your nodes discoverable and executable within the ROS 2 ecosystem.
+
+#### 1. Create Your Node File
+
+Create your Python node file in the `space_teams_python/space_teams_python` directory with a `main()` function:
+
+```python
+#!/usr/bin/env python3
+
+import rclpy
+from rclpy.node import Node
+
+class YourCustomNode(Node):
+    def __init__(self):
+        super().__init__('your_custom_node')
+        # Your node implementation here
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = YourCustomNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+#### 2. Edit setup.py
+
+Open `space_teams_python/setup.py` and add your node to the `entry_points` section:
+
+```python
+entry_points={
+    'console_scripts': [
+        'example_client = space_teams_python.example_client:main',
+        'image_client = space_teams_python.image_client:main',
+        'your_node_name = space_teams_python.your_node_file:main',  # Add this line
+    ],
+},
+```
+
+Where:
+- `your_node_name` is the command name you'll use with `ros2 run`
+- `space_teams_python.your_node_file` is the path to your Python module
+- `main` is the function that will be executed
+
+#### 3. Rebuild Your Package
+
+**Important:** You must rebuild your package after ANY changes to Python files, launch files, or setup.py:
+
+```bash
+colcon build --packages-select space_teams_python
+source install/setup.bash
+```
+
+This step is required whenever you:
+- Create or modify any Python node
+- Update launch files
+- Change setup.py or package.xml
+- Add new dependencies
+- Change any resource files
+
+#### 4. Run Your Custom Node
+
+Once built and sourced, you can run your node with:
+
+```bash
+ros2 run space_teams_python your_node_name
+```
+
 ### Creating your own client
 
 #### 1. Set up your Python ROS 2 node
