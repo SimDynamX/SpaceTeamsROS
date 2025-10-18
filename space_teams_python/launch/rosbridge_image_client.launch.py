@@ -33,9 +33,18 @@ def generate_launch_description():
         name='image_client',
         output='screen'
     )
-    
+
+    # example of adding a node to the launch description
+    # another_node = Node(
+    #     package='your_package (probably space_teams_python)',
+    #     executable='your_executable',
+    #     name='your_node_name',
+    #     output='screen'
+    # )
+
     return LaunchDescription([
         port_arg,
         rosbridge_launch,
-        image_client_node
+        image_client_node # , (make sure to separate with comma if adding a node)
+        # another_node
     ])
