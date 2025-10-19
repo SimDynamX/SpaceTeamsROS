@@ -18,7 +18,7 @@ Space Teams PRO communicates with ROS 2 through a Python script using `roslibpy`
 
 - **Operating System**: Linux (Ubuntu 22.04 in WSL recommended)
     - If using ROS2 Humble, Ubuntu 22.04 is required (it can be installed in WSL in addition to 24.04 if you already have that)
-- **ROS 2**: The `Humble` version is the only version with official support.
+- **ROS 2**: The `Humble` version is the only version with official support for our competition.
     - Any distribution with rosbridge_server support may work (`Humble`, `Iron`, `Jazzy`, `Rolling`)
     - To install ROS2 Humble, follow this tutorial: https://docs.ros.org/en/humble/Installation.html
     - Download the debian packages; Do not build ROS from source.
