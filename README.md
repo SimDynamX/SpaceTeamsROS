@@ -73,11 +73,11 @@ This will:
 
 ### 4. Run the example client
 
+The example client demonstrates how to use various rover control services like steering, acceleration, braking, and taking core samples.
+
 - Make sure that rosbridge is still running
 - Start the Competition sim in Space Teams PRO.
 - After choosing a role in STP, open up another WSL terminal to run the example client:
-
-The example client demonstrates how to use various rover control services like steering, acceleration, braking, and taking core samples.
 
 Ensure you're in the `SpaceTeamsROS` directory.
 
