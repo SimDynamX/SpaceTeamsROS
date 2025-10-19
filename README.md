@@ -60,7 +60,7 @@ ros2 launch space_teams_python rosbridge_image_client.launch.py
 
 This will:
 - Launch the rosbridge WebSocket server (default port: 9090)
-- Start the image client for receiving images from Space Teams PRO (`/CameraRGB` and `/CameraDepth` topics)
+- Start the image client for receiving images from Space Teams PRO (`/camera/image_raw` and `/camera/depth/image_raw` topics)
 
 **Keep this terminal running** - Space Teams PRO needs the bridge to be active for communication.
 
@@ -179,8 +179,8 @@ This service accepts a string message and returns a success status. Used for log
 | Topic Name | Message Type | Description |
 |------------|--------------|-------------|
 | `/CoreSamplingComplete` | `geometry_msgs/Point` | Published when core sampling is completed |
-| `/CameraRGB` | `sensor_msgs/Image` | RGB camera feed from rover (published by STP) |
-| `/CameraDepth` | `sensor_msgs/Image` | Depth camera feed from rover (published by STP) |
+| `/camera/image_raw` | `sensor_msgs/Image` | RGB camera feed from rover (published by STP) |
+| `/camera/depth/image_raw` | `sensor_msgs/Image` | Depth camera feed from rover (published by STP) |
 
 
 ## Development
@@ -490,14 +490,14 @@ Space Teams PRO provides both RGB and depth camera feeds via ROS 2 image topics,
 ### How to Use the RGB Camera Feed
 
 1. **Subscribe to the Image Topic**
-   - The camera publishes RGB images on the topic `/CameraRGB` using the standard `sensor_msgs/Image` message type
+   - The camera publishes RGB images on the topic `/camera/image_raw` using the standard `sensor_msgs/Image` message type
    - You can subscribe to this topic in your ROS 2 node:
 
    ```python
     from sensor_msgs.msg import Image
     self.subscription = self.create_subscription(
         Image,
-        '/CameraRGB',
+        'camera/image_raw',
         self.image_callback,
         10
     )
@@ -535,14 +535,14 @@ Space Teams PRO provides both RGB and depth camera feeds via ROS 2 image topics,
 Space Teams PRO also provides a depth camera feed that allows you to access distance information for each pixel in the image. This is particularly useful for obstacle detection, terrain analysis, and 3D environment mapping.
 
 1. **Subscribe to the Depth Topic**
-   - The depth camera publishes data on the topic `/CameraDepth` using the standard `sensor_msgs/Image` message type
+   - The depth camera publishes data on the topic `/camera/depth/image_raw` using the standard `sensor_msgs/Image` message type
    - Values in the depth image represent the distance in meters from the camera to objects in the scene
    
    ```python
    from sensor_msgs.msg import Image
    self.depth_subscription = self.create_subscription(
        Image,
-       '/CameraDepth',
+       '/camera/depth/image_raw',
        self.depth_callback,
        10
    )
