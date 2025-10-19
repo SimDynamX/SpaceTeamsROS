@@ -12,18 +12,18 @@ Space Teams PRO communicates with ROS 2 through a Python script using `roslibpy`
 - Custom ROS 2 service definitions for Space Teams PRO communication
 - Example Python client demonstrating service usage
 - Setup scripts for easy installation and configuration
-- Bridge setup for UE5 ↔ ROS 2 communication
+- Bridge setup for ST PRO ↔ ROS 2 communication
 
 ## Prerequisites
 
-- **Operating System**: Linux (Ubuntu in WSL recommended)
-    - If using ROS2 Humble, Ubuntu 22.04 is required (it can be installed in addition to 24.04 if you already have that)
-- **ROS 2**: Any distribution with rosbridge_server support (Humble, Iron, Jazzy, Rolling)
+- **Operating System**: Linux (Ubuntu 22.04 in WSL recommended)
+    - If using ROS2 Humble, Ubuntu 22.04 is required (it can be installed in WSL in addition to 24.04 if you already have that)
+- **ROS 2**: The `Humble` version is the only version with official support.
+    - Any distribution with rosbridge_server support may work (`Humble`, `Iron`, `Jazzy`, `Rolling`)
     - To install ROS2 Humble, follow this tutorial: https://docs.ros.org/en/humble/Installation.html
-    - Download the debian packages. Do not build ROS from source
+    - Download the debian packages; Do not build ROS from source.
     - Follow all of the steps in the tutorial and make sure you install ROS Dev tools as well.
-    - Make sure to install ROS dev tools as well.
-- **Python**: Python 3.6+
+- **Python**: Python 3.9+
 
 ## Quick Start
 
@@ -49,7 +49,7 @@ This script will:
 - Install `rosbridge_server` if not already installed
 - Install `cv_bridge` (ROS package) if not already installed
 - Install `opencv-python` (Python package) if not already installed
-- Initialize and set up `rosdep` to install a few more packages
+- Initialize and set up `rosdep` to install a few more packages (requires `sudo`)
 - Build the `space_teams_definitions` package using colcon
 
 ### 3. Start the ROS Bridge
@@ -139,7 +139,7 @@ Float data
 bool success
 ```
 
-This service accepts a float message and returns a success status. Used for control commands and parameter settings.
+This service accepts a (64-bit) float message and returns a success status. Used for control commands and parameter settings.
 
 ### String
 
@@ -155,7 +155,7 @@ string data
 bool success
 ```
 
-This service accepts a string message and returns a success status. Used for logging messages.
+This service accepts a (ASCII) string message and returns a success status. Used for logging messages.
 
 ## Available Services
 
@@ -175,7 +175,7 @@ This service accepts a string message and returns a success status. Used for log
 | Service Name | Service Type | Description |
 |--------------|--------------|-------------|
 | `/ChangeFOV` | `space_teams_definitions/Float` | Sets camera field of view (40.0 to 80.0 degrees) |
-| `/ChangeExposure` | `space_teams_definitions/Float` | Sets camera exposure (5.0 to 20.0) |
+| `/ChangeExposure` | `space_teams_definitions/Float` | Sets camera exposure in Exposure Value (5.0 to 20.0) |
 
 ### Topics
 
