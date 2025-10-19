@@ -72,6 +72,18 @@ fi
 #     echo "[ST] zmq is already installed."
 # fi
 
+# rosdep install if not installed
+if ! command -v rosdep &> /dev/null; then
+    echo "[ST] Installing rosdep..."
+    sudo apt update
+    sudo apt install -y python3-rosdep
+fi
+
+# rosdep setup
+sudo rosdep init
+rosdep update
+rosdep install --from-paths space_teams_python --ignore-src -r -y
+
 # rosdep setup
 sudo rosdep init
 rosdep update
