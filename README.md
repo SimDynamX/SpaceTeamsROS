@@ -16,7 +16,7 @@ Space Teams PRO communicates with ROS 2 through a Python script using `roslibpy`
 
 ## Prerequisites
 
-We are only officially supporting Windows 11 with Ubuntu 22.04 running in WSL2 for this competition.
+We are only officially supporting `Windows 11` with `Ubuntu 22.04` / `ROS2 Humble` running in `WSL2` for this competition.
 
 There may be other configurations that also work, possibly with a different linux distro, a different ROS2 version, running linux in a different VM host, or possibly rearranging what computers/VMs are running Windows vs Linux and changing some IPs in the connection code. We will attempt to assist you if you are running in a non-standard configuration but we can't guarantee it will work.
 
