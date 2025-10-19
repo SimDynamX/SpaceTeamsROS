@@ -104,7 +104,6 @@ Note: The image receiver is now automatically launched when you start the ROS br
 SpaceTeamsROS/
 ├── first_time_setup.bash          # Initial setup script
 ├── net_test/                      # Network testing scripts
-├── scripts/                       # Utility scripts
 ├── space_teams_definitions/       # ROS2 service definitions package
 │   ├── CMakeLists.txt
 │   ├── package.xml
