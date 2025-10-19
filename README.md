@@ -2,4 +2,4 @@
 | ----- | ----- | ----- |
 
 # Space Teams PRO ROS 2 Integration
-See the wiki here: https://github.com/SimDynamX/SpaceTeamsROS/wiki
+All info is on the wiki here: https://github.com/SimDynamX/SpaceTeamsROS/wiki
