@@ -1,3 +1,6 @@
+| [Rules & Info](https://github.com/SimDynamX/SpaceTeamsPro/discussions/106) | [SpaceTeamsROS (Here)](https://github.com/SimDynamX/SpaceTeamsROS) | [Q&A Discussions Category](https://github.com/SimDynamX/SpaceTeamsPRO/discussions/categories/2025-mars-autonomous-rover-rally-q-a)
+| ----- | ----- | ----- |
+
 # Space Teams PRO ROS 2 Integration
 
 This repository provides ROS 2 integration for Space Teams PRO as well as an example navigation algorithm for the Competition.
