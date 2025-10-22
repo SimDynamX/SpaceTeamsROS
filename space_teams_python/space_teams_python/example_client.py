@@ -19,6 +19,7 @@ class RoverController(Node):
         self.reverse_client = self.create_client(Float, 'Reverse')
         self.brake_client = self.create_client(Float, 'Brake')
         self.core_sampling_client = self.create_client(Float, 'CoreSample')
+        self.change_exposure_client = self.create_client(Float, 'ChangeExposure')
 
         # Topic subscriptions
         self.current_location_marsFrame = None
@@ -150,6 +151,12 @@ class RoverController(Node):
         self.initial_move_end_time = time.time() + 10.0
         self.log_message(f"Starting navigation to target: ({target_loc_localFrame[0]:.2f}, {target_loc_localFrame[1]:.2f})")
         self.send_accelerator_command(0.2)
+
+
+    def change_exposure(self, exposure_level: float):
+        request = Float.Request()
+        request.data = exposure_level
+        return self.change_exposure_client.call_async(request)
 
     def timer_callback(self):
         if not self.navigation_active:
