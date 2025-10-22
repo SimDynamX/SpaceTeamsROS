@@ -72,6 +72,15 @@ fi
 #     echo "[ST] zmq is already installed."
 # fi
 
+# Install colcon if not installed
+if ! command -v colcon &> /dev/null; then
+    echo "[ST] Installing colcon..."
+    sudo apt update
+    sudo apt install -y python3-colcon-common-extensions
+else
+    echo "[ST] colcon is already installed."
+fi
+
 # rosdep install if not installed
 if ! command -v rosdep &> /dev/null; then
     echo "[ST] Installing rosdep..."
@@ -84,15 +93,10 @@ sudo rosdep init
 rosdep update
 rosdep install --from-paths space_teams_python --ignore-src -r -y
 
-# rosdep setup
-sudo rosdep init
-rosdep update
-rosdep install --from-paths space_teams_python --ignore-src -r -y
+
 
 # Build the service definitions using colcon
 echo "[ST] Doing colcon build of space_teams_definitions..."
 colcon build --packages-select space_teams_definitions
 echo "[ST] Colcon build of space_teams_definitions done."
 
-# Make the run_rosbridge.bash script executable
-chmod +x run_rosbridge.bash
