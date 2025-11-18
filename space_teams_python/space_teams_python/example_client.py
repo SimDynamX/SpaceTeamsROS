@@ -20,6 +20,8 @@ class RoverController(Node):
         self.brake_client = self.create_client(Float, 'Brake')
         self.core_sampling_client = self.create_client(Float, 'CoreSample')
         self.change_exposure_client = self.create_client(Float, 'ChangeExposure')
+        self.change_rgb_freq_client = self.create_client(Float, 'ChangeRGBFreq')
+        self.change_depth_freq_client = self.create_client(Float, 'ChangeDepthFreq')
 
         # Topic subscriptions
         self.current_location_marsFrame = None
@@ -157,6 +159,16 @@ class RoverController(Node):
         request = Float.Request()
         request.data = exposure_level
         return self.change_exposure_client.call_async(request)
+
+    def change_rgb_freq(self, rgb_freq: float):
+        request = Float.Request()
+        request.data = rgb_freq
+        return self.change_rgb_freq_client.call_async(request)
+
+    def change_depth_freq(self, depth_freq: float):
+        request = Float.Request()
+        request.data = depth_freq
+        return self.change_depth_freq_client.call_async(request)
 
     def timer_callback(self):
         if not self.navigation_active:
@@ -302,6 +314,15 @@ def main(args=None):
 
     rover_controller.waypoints = waypoints_localFrame
     rover_controller.current_waypoint_idx = 0
+    
+    # Camera framerate adjustment
+    # Set to match defaults but you can adjust here as needed.
+    new_rgb_freq = 15.0
+    new_depth_freq = 5.0
+    rover_controller.log_message(f"Setting RGB frequency to {new_rgb_freq} Hz and Depth frequency to {new_depth_freq} Hz.")
+    rover_controller.get_logger().info(f"Setting RGB frequency to {new_rgb_freq} Hz and Depth frequency to {new_depth_freq} Hz.")
+    rover_controller.change_rgb_freq(new_rgb_freq)
+    rover_controller.change_depth_freq(new_depth_freq)
 
     rover_controller.log_message(
         f"Starting navigation: moving from ({current_x:.2f}, {current_y:.2f}) to ({waypoints_localFrame[0][0]:.2f}, {waypoints_localFrame[0][1]:.2f})"
