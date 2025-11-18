@@ -84,11 +84,6 @@ sudo rosdep init
 rosdep update
 rosdep install --from-paths space_teams_python --ignore-src -r -y
 
-# rosdep setup
-sudo rosdep init
-rosdep update
-rosdep install --from-paths space_teams_python --ignore-src -r -y
-
 # Build the service definitions using colcon
 echo "[ST] Doing colcon build of space_teams_definitions..."
 colcon build --packages-select space_teams_definitions
